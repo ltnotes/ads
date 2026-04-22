@@ -1,0 +1,90 @@
+# Q3_outlier_detection_olympics.py
+"""
+QUESTION 3: Outlier Detection (Distance-Based) on Olympics Dataset
+Dataset: olympics.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.neighbors import LocalOutlierFactor
+
+# Load data
+col_names = ["Country","Games","Gold1","Silver1","Bronze1",
+             "Gold2","Silver2","Bronze2","Gold3","Silver3",
+             "Bronze3","Gold4","Silver4","Bronze4","Total","Combined"]
+
+df = pd.read_csv("olympics.csv", skiprows=2, header=None, names=col_names)
+df = df.dropna(subset=["Country"])
+
+medal_cols = ["Gold1","Silver1","Bronze1","Total"]
+df[medal_cols] = df[medal_cols].apply(pd.to_numeric, errors="coerce")
+df = df.dropna(subset=medal_cols)
+
+print("\n" + "="*60)
+print("OUTLIER DETECTION USING LOF")
+print("="*60)
+print(f"Total countries analyzed: {len(df)}")
+
+# Apply LOF
+lof = LocalOutlierFactor(n_neighbors=5)
+predictions = lof.fit_predict(df[medal_cols])
+df["is_outlier"] = predictions  # -1 = outlier, 1 = inlier
+
+outlier_count = (predictions == -1).sum()
+print(f"\nOutliers detected: {outlier_count}")
+print(f"Inliers: {len(df) - outlier_count}")
+
+# Identify outlier countries
+outliers_df = df[df["is_outlier"] == -1]
+print("\n" + "="*60)
+print("OUTLIER COUNTRIES (Medal performance outliers)")
+print("="*60)
+for idx, row in outliers_df.iterrows():
+    print(f"• {row['Country']}: Gold={row['Gold1']}, Silver={row['Silver1']}, "
+          f"Bronze={row['Bronze1']}, Total={row['Total']}")
+
+# Clean data (remove outliers)
+df_clean = df[df["is_outlier"] == 1].drop("is_outlier", axis=1)
+print(f"\nData after outlier removal: {len(df_clean)} countries")
+
+# Visualizations
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Scatter plot with outliers highlighted
+colors = ["red" if o == -1 else "steelblue" for o in predictions]
+axes[0].scatter(df["Gold1"], df["Total"], c=colors, alpha=0.7, s=100)
+axes[0].set_xlabel("Gold Medals", fontsize=12)
+axes[0].set_ylabel("Total Medals", fontsize=12)
+axes[0].set_title("Gold vs Total Medals (Red=Outliers)", fontsize=12, fontweight='bold')
+axes[0].grid(True, alpha=0.3)
+
+# Add labels for outliers
+for idx, row in outliers_df.iterrows():
+    axes[0].annotate(row['Country'], (row['Gold1'], row['Total']), 
+                    xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+# Before/After count comparison
+axes[1].bar(["Before Removal", "After Removal"], 
+            [len(df), len(df_clean)], 
+            color=["steelblue", "green"])
+axes[1].set_title("Dataset Size Before/After Outlier Removal", fontsize=12, fontweight='bold')
+axes[1].set_ylabel("Number of Countries")
+axes[1].text(0, len(df)/2, f"Removed: {outlier_count}", ha='center', fontsize=10)
+axes[1].grid(True, alpha=0.3, axis='y')
+
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("CONCLUSION")
+print("="*60)
+print(f"""
+Outlier Analysis Results:
+• {outlier_count} countries identified as statistical outliers
+• These countries have medal counts significantly different from the norm
+• Most outliers are top-performing nations (USA, Russia, etc.) or countries 
+  with unusual medal distributions
+• Removing outliers can help for certain analyses but may lose important 
+  information about exceptional performance
+""")
