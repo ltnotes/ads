@@ -1,0 +1,122 @@
+# Q9_data_visualization.py
+"""
+QUESTION 9: Comprehensive Data Visualization on Placement Dataset
+Dataset: placement.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+df = pd.read_csv("placement.csv")
+
+# Encode categorical variables for correlation
+for col in df.select_dtypes(include="object").columns:
+    df[col] = pd.factorize(df[col])[0]
+
+# Identify key columns
+cgpa_col = next((c for c in df.columns if "cgpa" in c.lower()), df.columns[0])
+exam_col = next((c for c in df.columns if "exam" in c.lower() or "mark" in c.lower()), df.columns[1])
+placed_col = next((c for c in df.columns if "plac" in c.lower()), df.columns[-1])
+
+print("\n" + "="*60)
+print("DATA VISUALIZATION - PLACEMENT DATASET")
+print("="*60)
+print(f"Dataset shape: {df.shape}")
+print(f"CGPA column: {cgpa_col}")
+print(f"Exam marks column: {exam_col}")
+print(f"Placement status column: {placed_col}")
+
+# Create comprehensive visualization
+fig = plt.figure(figsize=(18, 12))
+
+# 1. CGPA Distribution
+ax1 = plt.subplot(2, 3, 1)
+df[cgpa_col].hist(bins=20, color="steelblue", edgecolor="black", alpha=0.7, ax=ax1)
+ax1.set_title("CGPA Distribution", fontsize=12, fontweight='bold')
+ax1.set_xlabel("CGPA")
+ax1.set_ylabel("Frequency")
+ax1.axvline(df[cgpa_col].mean(), color='red', linestyle='--', label=f"Mean: {df[cgpa_col].mean():.2f}")
+ax1.legend()
+ax1.grid(True, alpha=0.3)
+
+# 2. Exam Marks Distribution
+ax2 = plt.subplot(2, 3, 2)
+df[exam_col].hist(bins=20, color="orchid", edgecolor="black", alpha=0.7, ax=ax2)
+ax2.set_title("Exam Marks Distribution", fontsize=12, fontweight='bold')
+ax2.set_xlabel("Exam Marks")
+ax2.set_ylabel("Frequency")
+ax2.axvline(df[exam_col].mean(), color='red', linestyle='--', label=f"Mean: {df[exam_col].mean():.1f}")
+ax2.legend()
+ax2.grid(True, alpha=0.3)
+
+# 3. Placement Status Pie Chart
+ax3 = plt.subplot(2, 3, 3)
+placed_counts = df[placed_col].value_counts()
+colors_pie = ["#ff6b6b", "#51cf66"]
+labels = ["Not Placed", "Placed"]
+ax3.pie(placed_counts, labels=labels, autopct="%1.1f%%", colors=colors_pie, startangle=90)
+ax3.set_title("Placement Status Distribution", fontsize=12, fontweight='bold')
+
+# 4. CGPA by Placement Status (Boxplot)
+ax4 = plt.subplot(2, 3, 4)
+df.boxplot(column=cgpa_col, by=placed_col, ax=ax4, patch_artist=True,
+           boxprops=dict(facecolor='lightblue'))
+ax4.set_title("CGPA Distribution by Placement Status", fontsize=12, fontweight='bold')
+ax4.set_xlabel("Placement Status")
+ax4.set_ylabel("CGPA")
+ax4.grid(True, alpha=0.3)
+
+# 5. CGPA vs Exam Marks Scatter Plot
+ax5 = plt.subplot(2, 3, 5)
+colors_scatter = ["#ff6b6b" if p == 0 else "#51cf66" for p in df[placed_col]]
+scatter = ax5.scatter(df[cgpa_col], df[exam_col], c=colors_scatter, alpha=0.6, s=50, edgecolors='white')
+ax5.set_xlabel("CGPA", fontsize=11)
+ax5.set_ylabel("Exam Marks", fontsize=11)
+ax5.set_title("CGPA vs Exam Marks\n(Red=Not Placed, Green=Placed)", fontsize=12, fontweight='bold')
+ax5.grid(True, alpha=0.3)
+
+# Add trend line
+z = np.polyfit(df[cgpa_col], df[exam_col], 1)
+p = np.poly1d(z)
+ax5.plot(df[cgpa_col].sort_values(), p(df[cgpa_col].sort_values()), "b--", alpha=0.5)
+
+# 6. Correlation Heatmap
+ax6 = plt.subplot(2, 3, 6)
+numeric_df = df.select_dtypes(include=[np.number])
+corr_matrix = numeric_df.corr()
+sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", 
+            ax=ax6, square=True, cbar_kws={"shrink": 0.8})
+ax6.set_title("Feature Correlation Heatmap", fontsize=12, fontweight='bold')
+
+plt.suptitle("Placement Dataset - Comprehensive Visualization Suite", fontsize=16, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Additional insights
+print("\n" + "="*60)
+print("KEY INSIGHTS FROM VISUALIZATIONS")
+print("="*60)
+print(f"""
+1. CGPA Distribution:
+   • Mean CGPA: {df[cgpa_col].mean():.3f}
+   • Range: {df[cgpa_col].min():.2f} - {df[cgpa_col].max():.2f}
+
+2. Exam Marks Distribution:
+   • Mean Score: {df[exam_col].mean():.1f}
+   • Range: {df[exam_col].min():.0f} - {df[exam_col].max():.0f}
+
+3. Placement Statistics:
+   • Placed: {placed_counts[1] if 1 in placed_counts else 0} students ({placed_counts[1]/len(df)*100:.1f}%)
+   • Not Placed: {placed_counts[0] if 0 in placed_counts else 0} students ({placed_counts[0]/len(df)*100:.1f}%)
+
+4. Correlation Analysis:
+   • CGPA-Placement correlation: {corr_matrix.loc[cgpa_col, placed_col]:.3f}
+   • Exam-Placement correlation: {corr_matrix.loc[exam_col, placed_col]:.3f}
+
+Recommendations:
+• Students with higher CGPA and exam scores have better placement chances
+• Focus on improving both academic performance and aptitude skills
+""")
