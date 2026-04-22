@@ -1,0 +1,145 @@
+# Q13_scatter_correlation.py
+"""
+QUESTION 13: Scatter Plot & Correlation Analysis on Tips Dataset
+Dataset: tips.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+
+# Load data
+df = pd.read_csv("tips.csv")
+
+print("\n" + "="*70)
+print("SCATTER PLOT & CORRELATION ANALYSIS - TIPS DATASET")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Columns: {list(df.columns)}")
+
+# Calculate correlations
+print("\n" + "="*60)
+print("CORRELATION ANALYSIS")
+print("="*60)
+
+numeric_cols = df.select_dtypes(include=[np.number]).columns
+correlation_matrix = df[numeric_cols].corr()
+
+print("\nPearson Correlation Coefficients:")
+for i, col1 in enumerate(numeric_cols):
+    for col2 in numeric_cols[i+1:]:
+        corr, p_value = stats.pearsonr(df[col1], df[col2])
+        significance = "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*" if p_value < 0.05 else ""
+        print(f"  {col1} vs {col2}: r = {corr:.4f} {significance} (p={p_value:.4f})")
+
+# Detailed analysis for total_bill vs tip
+print("\n" + "="*60)
+print("DETAILED ANALYSIS: Total Bill vs Tip")
+print("="*60)
+
+corr_total_tip, p_total_tip = stats.pearsonr(df["total_bill"], df["tip"])
+print(f"Correlation coefficient: {corr_total_tip:.4f}")
+print(f"P-value: {p_total_tip:.4f}")
+
+if p_total_tip < 0.05:
+    print("Conclusion: Statistically significant positive correlation")
+    print("Interpretation: Higher bills tend to receive higher tips")
+    
+    # Calculate regression line
+    slope, intercept = np.polyfit(df["total_bill"], df["tip"], 1)
+    print(f"\nRegression line: Tip = {slope:.4f} × Total_Bill + {intercept:.4f}")
+    print(f"Interpretation: For every $10 increase in bill, tip increases by ${slope*10:.2f}")
+
+# Create visualizations
+fig = plt.figure(figsize=(18, 10))
+
+# 1. Scatter plot: Total Bill vs Tip
+ax1 = plt.subplot(2, 3, 1)
+scatter1 = ax1.scatter(df["total_bill"], df["tip"], c=df["total_bill"], 
+                        cmap='viridis', alpha=0.6, s=80, edgecolors='white')
+ax1.plot(df["total_bill"], slope*df["total_bill"] + intercept, 'r-', 
+         linewidth=2, label=f'Regression (r={corr_total_tip:.3f})')
+ax1.set_xlabel("Total Bill ($)", fontsize=11)
+ax1.set_ylabel("Tip ($)", fontsize=11)
+ax1.set_title("Total Bill vs Tip Amount", fontsize=12, fontweight='bold')
+ax1.legend()
+ax1.grid(True, alpha=0.3)
+plt.colorbar(scatter1, ax=ax1, label="Total Bill")
+
+# 2. Scatter plot: Total Bill vs Size
+ax2 = plt.subplot(2, 3, 2)
+corr_bill_size, _ = stats.pearsonr(df["total_bill"], df["size"])
+scatter2 = ax2.scatter(df["total_bill"], df["size"], c=df["size"], 
+                        cmap='plasma', alpha=0.6, s=80, edgecolors='white')
+ax2.set_xlabel("Total Bill ($)", fontsize=11)
+ax2.set_ylabel("Party Size", fontsize=11)
+ax2.set_title(f"Total Bill vs Party Size (r={corr_bill_size:.3f})", 
+              fontsize=12, fontweight='bold')
+ax2.grid(True, alpha=0.3)
+plt.colorbar(scatter2, ax=ax2, label="Party Size")
+
+# 3. Scatter plot: Tip vs Party Size
+ax3 = plt.subplot(2, 3, 3)
+corr_tip_size, _ = stats.pearsonr(df["tip"], df["size"])
+scatter3 = ax3.scatter(df["tip"], df["size"], c=df["tip"], 
+                        cmap='coolwarm', alpha=0.6, s=80, edgecolors='white')
+ax3.set_xlabel("Tip ($)", fontsize=11)
+ax3.set_ylabel("Party Size", fontsize=11)
+ax3.set_title(f"Tip vs Party Size (r={corr_tip_size:.3f})", 
+              fontsize=12, fontweight='bold')
+ax3.grid(True, alpha=0.3)
+plt.colorbar(scatter3, ax=ax3, label="Tip Amount")
+
+# 4. Correlation Heatmap
+ax4 = plt.subplot(2, 3, 4)
+sns.heatmap(correlation_matrix, annot=True, fmt=".3f", cmap="coolwarm", 
+            ax=ax4, square=True, cbar_kws={"shrink": 0.8})
+ax4.set_title("Correlation Heatmap", fontsize=12, fontweight='bold')
+
+# 5. Joint plot style (hexbin)
+ax5 = plt.subplot(2, 3, 5)
+hb = ax5.hexbin(df["total_bill"], df["tip"], gridsize=20, cmap='YlOrRd', alpha=0.7)
+ax5.set_xlabel("Total Bill ($)", fontsize=11)
+ax5.set_ylabel("Tip ($)", fontsize=11)
+ax5.set_title("Density Plot: Total Bill vs Tip", fontsize=12, fontweight='bold')
+plt.colorbar(hb, ax=ax5, label="Count")
+
+# 6. Tips by day boxplot
+ax6 = plt.subplot(2, 3, 6)
+day_order = ['Thur', 'Fri', 'Sat', 'Sun']
+df['day'] = pd.Categorical(df['day'], categories=day_order, ordered=True)
+df.boxplot(column='tip', by='day', ax=ax6)
+ax6.set_title("Tip Distribution by Day", fontsize=12, fontweight='bold')
+ax6.set_xlabel("Day")
+ax6.set_ylabel("Tip ($)")
+ax6.grid(True, alpha=0.3)
+
+plt.suptitle("Comprehensive Correlation & Scatter Plot Analysis", fontsize=16, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Additional insights
+print("\n" + "="*70)
+print("KEY INSIGHTS FROM ANALYSIS")
+print("="*70)
+print(f"""
+1. Strongest Correlation:
+   • Total Bill vs Tip: r = {corr_total_tip:.3f}
+   • This is expected as tips are typically percentage-based
+
+2. Moderate Correlations:
+   • Total Bill vs Party Size: r = {corr_bill_size:.3f}
+   • Larger parties tend to have higher bills
+
+3. Practical Implications:
+   • Tip amount is strongly influenced by total bill
+   • Party size affects both bill amount and tipping behavior
+   • Different days show different tipping patterns
+
+Recommendations for Restaurant:
+   • Train staff to provide excellent service for large parties
+   • Consider automatic gratuity for parties > 6
+   • Analyze day-specific promotions to maximize tips
+""")
