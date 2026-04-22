@@ -1,0 +1,122 @@
+# Q6_housing_metrics.py
+"""
+QUESTION 6: Performance Evaluation Metrics on Housing Dataset
+Dataset: housing.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# Load data (handle header detection)
+_h = pd.read_csv("housing.csv", nrows=1, header=None)
+_has_header = not all(_h.iloc[0].apply(lambda v: str(v).replace('.','',1).replace('-','',1).lstrip().isdigit()))
+df = pd.read_csv("housing.csv", header=0 if _has_header else None)
+
+if not _has_header:
+    df.columns = [f"Feature_{i}" for i in range(df.shape[1]-1)] + ["Price"]
+else:
+    df.rename(columns={df.columns[-1]: "Price"}, inplace=True)
+
+df = df.apply(pd.to_numeric, errors="coerce").dropna()
+
+print("\n" + "="*60)
+print("HOUSING PRICE PREDICTION - MODEL COMPARISON")
+print("="*60)
+print(f"Dataset shape: {df.shape}")
+print(f"Features: {list(df.columns[:-1])}")
+print(f"Target: Price")
+
+# Split data
+X = df.drop("Price", axis=1)
+y = df["Price"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"\nTraining set: {len(X_train)} samples")
+print(f"Test set: {len(X_test)} samples")
+
+# Models
+models = {
+    "Linear Regression": LinearRegression(),
+    "Decision Tree": DecisionTreeRegressor(random_state=42, max_depth=5)
+}
+
+results = {}
+
+print("\n" + "="*60)
+print("MODEL PERFORMANCE METRICS")
+print("="*60)
+
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(y_test, y_pred)
+    
+    results[name] = {"MAE": mae, "MSE": mse, "RMSE": rmse, "R2": r2}
+    
+    print(f"\n{name}:")
+    print(f"  • Mean Absolute Error (MAE):  ${mae:,.2f}")
+    print(f"  • Mean Squared Error (MSE):   ${mse:,.2f}")
+    print(f"  • Root Mean Squared Error:    ${rmse:,.2f}")
+    print(f"  • R² Score:                   {r2:.4f}")
+
+# Visualizations
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# Metrics comparison
+metrics = ["MAE", "RMSE", "R2"]
+x = np.arange(len(metrics))
+width = 0.35
+
+for i, (name, metrics_dict) in enumerate(results.items()):
+    values = [metrics_dict["MAE"], metrics_dict["RMSE"], metrics_dict["R2"]]
+    # Normalize MAE and RMSE for better visualization
+    if name == "Linear Regression":
+        values[0] = values[0] / max(results["Linear Regression"]["MAE"], results["Decision Tree"]["MAE"])
+        values[1] = values[1] / max(results["Linear Regression"]["RMSE"], results["Decision Tree"]["RMSE"])
+    else:
+        values[0] = values[0] / max(results["Linear Regression"]["MAE"], results["Decision Tree"]["MAE"])
+        values[1] = values[1] / max(results["Linear Regression"]["RMSE"], results["Decision Tree"]["RMSE"])
+    
+    axes[0].bar(x + i*width, values, width, label=name)
+
+axes[0].set_xticks(x + width/2)
+axes[0].set_xticklabels(metrics)
+axes[0].set_ylabel("Normalized Score (lower is better for MAE/RMSE)")
+axes[0].set_title("Model Performance Comparison", fontsize=12, fontweight='bold')
+axes[0].legend()
+axes[0].grid(True, alpha=0.3)
+
+# Actual vs Predicted for Linear Regression
+lr_model = LinearRegression()
+lr_model.fit(X_train, y_train)
+y_pred_lr = lr_model.predict(X_test)
+
+axes[1].scatter(y_test, y_pred_lr, alpha=0.5, color="steelblue", edgecolors='white', s=80)
+axes[1].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2, label="Perfect Prediction")
+axes[1].set_xlabel("Actual Price ($)", fontsize=11)
+axes[1].set_ylabel("Predicted Price ($)", fontsize=11)
+axes[1].set_title("Linear Regression: Actual vs Predicted", fontsize=12, fontweight='bold')
+axes[1].legend()
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("CONCLUSION")
+print("="*60)
+best_model = max(results, key=lambda x: results[x]["R2"])
+print(f"Best Model: {best_model}")
+print(f"Best R² Score: {results[best_model]['R2']:.4f}")
+print(f"\nInterpretation:")
+print(f"• MAE: On average, predictions are off by ${results[best_model]['MAE']:,.2f}")
+print(f"• R²: {results[best_model]['R2']*100:.1f}% of variance in prices is explained by the model")
