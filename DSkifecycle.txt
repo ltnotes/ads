@@ -1,0 +1,173 @@
+# Q5_data_science_lifecycle.py
+"""
+QUESTION 5: Complete Data Science Lifecycle on Diabetes Dataset
+Dataset: diabetes.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+print("\n" + "="*70)
+print("DATA SCIENCE LIFECYCLE - DIABETES PREDICTION")
+print("="*70)
+
+# ========== STEP 1: DATA COLLECTION ==========
+print("\n" + "="*60)
+print("STEP 1: DATA COLLECTION")
+print("="*60)
+df = pd.read_csv("diabetes.csv")
+print(f"Dataset shape: {df.shape}")
+print(f"Features: {list(df.columns)}")
+print(f"Target variable: Outcome (0=No Diabetes, 1=Diabetes)")
+
+# ========== STEP 2: DATA EXPLORATION ==========
+print("\n" + "="*60)
+print("STEP 2: DATA EXPLORATION (EDA)")
+print("="*60)
+print("\nStatistical Summary:")
+print(df.describe())
+print(f"\nMissing values:\n{df.isnull().sum()}")
+print(f"\nClass distribution:\n{df['Outcome'].value_counts()}")
+
+# Visualizations
+fig, axes = plt.subplots(3, 3, figsize=(15, 12))
+for i, col in enumerate(df.columns[:-1]):
+    ax = axes[i//3][i%3]
+    df[col].hist(ax=ax, bins=20, color="steelblue", edgecolor="black", alpha=0.7)
+    ax.set_title(f"Distribution of {col}", fontsize=10, fontweight='bold')
+    ax.set_xlabel(col)
+    ax.set_ylabel("Frequency")
+plt.suptitle("STEP 2: Feature Distributions", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# ========== STEP 3: DATA PREPROCESSING ==========
+print("\n" + "="*60)
+print("STEP 3: DATA PREPROCESSING")
+print("="*60)
+
+# Handle zero values in physiological columns
+zero_cols = ["Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI"]
+print("Handling zero values in medical measurements...")
+for col in zero_cols:
+    zero_count = (df[col] == 0).sum()
+    if zero_count > 0:
+        median_val = df[col].median()
+        df[col] = df[col].replace(0, median_val)
+        print(f"  • {col}: Replaced {zero_count} zeros with median ({median_val:.1f})")
+
+# ========== STEP 4: FEATURE ENGINEERING ==========
+print("\n" + "="*60)
+print("STEP 4: FEATURE ENGINEERING")
+print("="*60)
+
+# Create new features
+df["Glucose_BMI_Ratio"] = df["Glucose"] / df["BMI"]
+df["Age_Group"] = pd.cut(df["Age"], bins=[0, 30, 40, 50, 100], 
+                          labels=["<30", "30-40", "40-50", "50+"])
+df["High_Risk_Glucose"] = (df["Glucose"] > 140).astype(int)
+
+print("New features created:")
+print("  • Glucose_BMI_Ratio: Interaction between glucose and BMI")
+print("  • Age_Group: Categorized age groups")
+print("  • High_Risk_Glucose: Binary indicator for high glucose")
+
+# Scale features
+X = df.drop("Outcome", axis=1)
+y = df["Outcome"]
+
+# Select only numeric columns for scaling
+numeric_cols = X.select_dtypes(include=[np.number]).columns
+X_numeric = X[numeric_cols]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_numeric)
+print(f"\nFeatures scaled using StandardScaler (mean=0, std=1)")
+print(f"Scaled feature shape: {X_scaled.shape}")
+
+# ========== STEP 5: MODEL BUILDING ==========
+print("\n" + "="*60)
+print("STEP 5: MODEL BUILDING")
+print("="*60)
+
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+model = LogisticRegression(max_iter=1000, random_state=42)
+model.fit(X_train, y_train)
+
+print("Model: Logistic Regression")
+print(f"Training set size: {len(X_train)} samples")
+print(f"Test set size: {len(X_test)} samples")
+
+# ========== STEP 6: MODEL EVALUATION ==========
+print("\n" + "="*60)
+print("STEP 6: MODEL EVALUATION")
+print("="*60)
+
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+
+print(f"Model Accuracy: {accuracy:.4f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=["No Diabetes", "Diabetes"]))
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+# Confusion Matrix
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[0],
+            xticklabels=["No Diabetes", "Diabetes"],
+            yticklabels=["No Diabetes", "Diabetes"])
+axes[0].set_title("Confusion Matrix", fontsize=12, fontweight='bold')
+axes[0].set_xlabel("Predicted")
+axes[0].set_ylabel("Actual")
+
+# Feature Importance
+feature_importance = np.abs(model.coef_[0])
+feature_names = numeric_cols
+sorted_idx = np.argsort(feature_importance)
+
+axes[1].barh(range(len(sorted_idx)), feature_importance[sorted_idx])
+axes[1].set_yticks(range(len(sorted_idx)))
+axes[1].set_yticklabels(feature_names[sorted_idx])
+axes[1].set_xlabel("Coefficient Magnitude")
+axes[1].set_title("Feature Importance", fontsize=12, fontweight='bold')
+
+plt.suptitle("STEP 6: Model Evaluation Results", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# ========== STEP 7: DEPLOYMENT ==========
+print("\n" + "="*60)
+print("STEP 7: DEPLOYMENT")
+print("="*60)
+print("""
+Model ready for deployment! Next steps:
+
+1. Save the model: 
+   import joblib
+   joblib.dump(model, 'diabetes_model.pkl')
+   joblib.dump(scaler, 'scaler.pkl')
+
+2. Create API endpoint (Flask/FastAPI):
+   @app.route('/predict', methods=['POST'])
+   def predict():
+       data = request.json
+       scaled_data = scaler.transform(data)
+       prediction = model.predict(scaled_data)
+       return {'diabetes_risk': int(prediction[0])}
+
+3. Monitor model performance and retrain periodically
+""")
+
+print("\n" + "="*70)
+print("DATA SCIENCE LIFECYCLE COMPLETED SUCCESSFULLY!")
+print("="*70)
