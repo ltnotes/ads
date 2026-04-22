@@ -1,0 +1,103 @@
+# Q4_time_series_forecasting.py
+"""
+QUESTION 4: Time Series Forecasting on Airline Passengers
+Dataset: international-airline-passengers.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+import warnings
+warnings.filterwarnings('ignore')
+
+# Load data
+df = pd.read_csv("international-airline-passengers.csv", skiprows=0, header=0)
+df.columns = ["Month", "Passengers"]
+df = df.dropna()
+df["Passengers"] = pd.to_numeric(df["Passengers"], errors="coerce")
+df = df.dropna()
+df["Month"] = pd.to_datetime(df["Month"])
+df = df.set_index("Month")
+series = df["Passengers"].asfreq("MS")
+
+print("\n" + "="*60)
+print("TIME SERIES ANALYSIS")
+print("="*60)
+print(f"Date range: {series.index[0]} to {series.index[-1]}")
+print(f"Total observations: {len(series)}")
+print(f"Monthly passengers - Mean: {series.mean():.0f}, Std: {series.std():.0f}")
+
+# Time Series Decomposition
+print("\n" + "="*60)
+print("SEASONAL DECOMPOSITION")
+print("="*60)
+decomposition = seasonal_decompose(series, model="multiplicative")
+
+fig, axes = plt.subplots(4, 1, figsize=(14, 12))
+series.plot(ax=axes[0], color="steelblue", linewidth=1)
+axes[0].set_title("Original Time Series - Airline Passengers", fontsize=12, fontweight='bold')
+axes[0].set_ylabel("Passengers")
+axes[0].grid(True, alpha=0.3)
+
+decomposition.trend.plot(ax=axes[1], color="green", linewidth=1)
+axes[1].set_title("Trend Component", fontsize=12, fontweight='bold')
+axes[1].set_ylabel("Passengers")
+axes[1].grid(True, alpha=0.3)
+
+decomposition.seasonal.plot(ax=axes[2], color="orange", linewidth=1)
+axes[2].set_title("Seasonal Component", fontsize=12, fontweight='bold')
+axes[2].set_ylabel("Seasonal Effect")
+axes[2].grid(True, alpha=0.3)
+
+decomposition.resid.plot(ax=axes[3], color="red", linewidth=1)
+axes[3].set_title("Residual Component (Noise)", fontsize=12, fontweight='bold')
+axes[3].set_ylabel("Residual")
+axes[3].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+# Holt-Winters Forecasting
+print("\n" + "="*60)
+print("HOLT-WINTERS FORECASTING")
+print("="*60)
+
+model = ExponentialSmoothing(series, seasonal="mul", trend="add", seasonal_periods=12)
+fitted_model = model.fit()
+forecast_24 = fitted_model.forecast(24)
+
+print("\nForecast for next 24 months:")
+print("-"*40)
+for i, (date, value) in enumerate(forecast_24.items()):
+    if i < 12:
+        print(f"{date.strftime('%Y-%m')}: {value:.0f} passengers")
+    elif i == 12:
+        print("\nYear 2:")
+    if i >= 12:
+        print(f"{date.strftime('%Y-%m')}: {value:.0f} passengers")
+
+# Plot forecast
+fig, ax = plt.subplots(figsize=(14, 6))
+series.plot(ax=ax, label="Historical Data", color="steelblue", linewidth=2)
+forecast_24.plot(ax=ax, label="24-Month Forecast", color="tomato", linewidth=2, linestyle="--")
+ax.fill_between(forecast_24.index, forecast_24 - fitted_model.resid.std(), 
+                 forecast_24 + fitted_model.resid.std(), alpha=0.2, color="tomato")
+ax.set_title("Airline Passengers - Holt-Winters Forecast", fontsize=14, fontweight='bold')
+ax.set_xlabel("Year")
+ax.set_ylabel("Number of Passengers")
+ax.legend(fontsize=10)
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("INSIGHTS")
+print("="*60)
+print("""
+1. STRONG SEASONALITY: Clear annual pattern with peaks in summer months
+2. UPWARD TREND: Consistent growth in air travel over the years
+3. FORECAST: Expect continued growth with seasonal variations
+4. BUSINESS IMPACT: Airlines should increase capacity during peak months
+""")
