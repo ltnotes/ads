@@ -1,0 +1,108 @@
+# Q10_boxplot_outliers.py
+"""
+QUESTION 10: Outlier Detection using Box Plot on Tips Dataset
+Dataset: tips.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load data
+df = pd.read_csv("tips.csv")
+numeric_cols = df.select_dtypes(include=[np.number]).columns
+
+print("\n" + "="*60)
+print("OUTLIER DETECTION USING BOX PLOT (IQR METHOD)")
+print("="*60)
+print(f"Dataset shape: {df.shape}")
+print(f"Numeric columns: {list(numeric_cols)}")
+
+# Detect outliers using IQR method
+outlier_summary = {}
+
+print("\n" + "="*60)
+print("OUTLIER ANALYSIS BY COLUMN")
+print("="*60)
+
+for col in numeric_cols:
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)][col]
+    outlier_count = len(outliers)
+    
+    outlier_summary[col] = {
+        "Q1": Q1, "Q3": Q3, "IQR": IQR,
+        "lower_bound": lower_bound, "upper_bound": upper_bound,
+        "outlier_count": outlier_count, "outliers": outliers.values
+    }
+    
+    print(f"\n{col}:")
+    print(f"  • Q1 (25th percentile): {Q1:.2f}")
+    print(f"  • Q3 (75th percentile): {Q3:.2f}")
+    print(f"  • IQR: {IQR:.2f}")
+    print(f"  • Lower bound: {lower_bound:.2f}")
+    print(f"  • Upper bound: {upper_bound:.2f}")
+    print(f"  • Outliers detected: {outlier_count}")
+    
+    if outlier_count > 0:
+        print(f"  • Outlier values: {', '.join([f'{x:.2f}' for x in outliers[:5]])}")
+        if outlier_count > 5:
+            print(f"    ... and {outlier_count - 5} more")
+
+# Create box plots
+fig, axes = plt.subplots(1, len(numeric_cols), figsize=(15, 6))
+
+for i, col in enumerate(numeric_cols):
+    bp = axes[i].boxplot(df[col].dropna(), patch_artist=True)
+    bp['boxes'][0].set_facecolor('lightblue')
+    axes[i].set_title(f"{col}\n({outlier_summary[col]['outlier_count']} outliers)", 
+                      fontsize=12, fontweight='bold')
+    axes[i].set_ylabel(col)
+    axes[i].grid(True, alpha=0.3, axis='y')
+    
+    # Add statistics text
+    stats_text = f"Median: {df[col].median():.2f}\nMean: {df[col].mean():.2f}"
+    axes[i].text(0.05, 0.95, stats_text, transform=axes[i].transAxes,
+                 fontsize=9, verticalalignment='top',
+                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+plt.suptitle("Box Plot Outlier Detection - Tips Dataset", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Summary statistics with and without outliers
+print("\n" + "="*60)
+print("IMPACT OF OUTLIERS ON STATISTICS")
+print("="*60)
+
+for col in numeric_cols:
+    outliers_removed = df[~((df[col] < outlier_summary[col]['lower_bound']) | 
+                            (df[col] > outlier_summary[col]['upper_bound']))][col]
+    
+    print(f"\n{col}:")
+    print(f"  With outliers    - Mean: {df[col].mean():.2f}, Std: {df[col].std():.2f}")
+    print(f"  Without outliers - Mean: {outliers_removed.mean():.2f}, Std: {outliers_removed.std():.2f}")
+    print(f"  Change in mean: {((outliers_removed.mean() - df[col].mean()) / df[col].mean() * 100):.1f}%")
+
+print("\n" + "="*60)
+print("CONCLUSION")
+print("="*60)
+print("""
+Box plots (IQR method) successfully identified outliers in the dataset:
+
+1. Outliers are data points falling below Q1 - 1.5*IQR or above Q3 + 1.5*IQR
+2. These represent unusual values that may be:
+   - Data entry errors
+   - Genuine extreme cases (e.g., very high tips)
+   - Special circumstances
+
+Recommendation:
+• Investigate outliers before removal
+• Consider winsorization (capping) instead of deletion
+• Document outlier handling in analysis report
+""")
