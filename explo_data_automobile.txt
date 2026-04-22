@@ -1,0 +1,155 @@
+# Q12_eda_automobile.py
+"""
+QUESTION 12: Exploratory Data Analysis on Automobile Dataset
+Dataset: Automobile_data.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+df = pd.read_csv("Automobile_data.csv")
+df.replace("?", np.nan, inplace=True)
+
+# Convert to numeric where possible
+for col in df.columns:
+    try:
+        df[col] = pd.to_numeric(df[col])
+    except:
+        pass
+
+print("\n" + "="*70)
+print("EXPLORATORY DATA ANALYSIS - AUTOMOBILE DATASET")
+print("="*70)
+
+# Basic information
+print("\n" + "="*60)
+print("1. DATASET OVERVIEW")
+print("="*60)
+print(f"Shape: {df.shape}")
+print(f"\nColumns: {list(df.columns)}")
+
+print("\n" + "="*60)
+print("2. DATA TYPES")
+print("="*60)
+print(df.dtypes.value_counts())
+
+print("\n" + "="*60)
+print("3. MISSING VALUES ANALYSIS")
+print("="*60)
+missing = df.isnull().sum()
+missing_pct = (missing / len(df)) * 100
+missing_df = pd.DataFrame({'Missing': missing, 'Percentage': missing_pct})
+missing_df = missing_df[missing_df['Missing'] > 0].sort_values('Missing', ascending=False)
+if len(missing_df) > 0:
+    print(missing_df)
+else:
+    print("No missing values found")
+
+print("\n" + "="*60)
+print("4. DESCRIPTIVE STATISTICS (NUMERIC FEATURES)")
+print("="*60)
+numeric_df = df.select_dtypes(include=[np.number])
+print(numeric_df.describe())
+
+print("\n" + "="*60)
+print("5. CATEGORICAL FEATURES ANALYSIS")
+print("="*60)
+categorical_df = df.select_dtypes(exclude=[np.number])
+for col in categorical_df.columns[:5]:  # Show first 5
+    print(f"\n{col}:")
+    print(f"  Unique values: {categorical_df[col].nunique()}")
+    print(f"  Top categories:\n{categorical_df[col].value_counts().head(3)}")
+
+# Visualizations
+fig = plt.figure(figsize=(20, 12))
+
+# Histograms for numeric features
+numeric_cols = numeric_df.columns[:8]  # First 8 numeric columns
+for i, col in enumerate(numeric_cols):
+    ax = plt.subplot(2, 4, i+1)
+    df[col].dropna().hist(bins=20, color="steelblue", edgecolor="black", alpha=0.7, ax=ax)
+    ax.set_title(f"Distribution of {col}", fontsize=10, fontweight='bold')
+    ax.set_xlabel(col)
+    ax.set_ylabel("Frequency")
+    ax.grid(True, alpha=0.3)
+
+plt.suptitle("Feature Distributions - Automobile Dataset", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Correlation Heatmap
+fig, ax = plt.subplots(figsize=(14, 10))
+corr_matrix = numeric_df.corr()
+mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+sns.heatmap(corr_matrix, mask=mask, annot=True, fmt=".2f", cmap="coolwarm",
+            ax=ax, square=True, cbar_kws={"shrink": 0.8}, annot_kws={"size": 8})
+ax.set_title("Correlation Heatmap of Numeric Features", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Categorical feature analysis
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Fuel type distribution
+if "fuel-type" in df.columns:
+    fuel_counts = df["fuel-type"].value_counts()
+    axes[0].bar(fuel_counts.index, fuel_counts.values, color=["steelblue", "orange"])
+    axes[0].set_title("Fuel Type Distribution", fontsize=12, fontweight='bold')
+    axes[0].set_xlabel("Fuel Type")
+    axes[0].set_ylabel("Count")
+    axes[0].grid(True, alpha=0.3, axis='y')
+
+# Body style distribution
+if "body-style" in df.columns:
+    body_counts = df["body-style"].value_counts()
+    axes[1].bar(body_counts.index, body_counts.values, color="lightgreen", edgecolor="black")
+    axes[1].set_title("Body Style Distribution", fontsize=12, fontweight='bold')
+    axes[1].set_xlabel("Body Style")
+    axes[1].set_ylabel("Count")
+    axes[1].tick_params(axis='x', rotation=45)
+    axes[1].grid(True, alpha=0.3, axis='y')
+
+plt.suptitle("Categorical Feature Analysis", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Box plots for key features
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+key_features = ["price", "horsepower", "engine-size"] if "price" in df.columns else numeric_cols[:3]
+for i, col in enumerate(key_features[:3]):
+    if col in df.columns:
+        df.boxplot(column=col, ax=axes[i])
+        axes[i].set_title(f"Boxplot of {col}", fontsize=12, fontweight='bold')
+        axes[i].set_ylabel(col)
+        axes[i].grid(True, alpha=0.3)
+
+plt.suptitle("Outlier Detection in Key Features", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*70)
+print("KEY FINDINGS FROM EDA")
+print("="*70)
+print(f"""
+1. Dataset Statistics:
+   • Total records: {len(df)}
+   • Total features: {len(df.columns)}
+   • Numeric features: {len(numeric_df.columns)}
+   • Categorical features: {len(categorical_df.columns)}
+
+2. Missing Data:
+   • Columns with missing values: {len(missing_df)}
+   • Total missing values: {missing.sum()}
+
+3. Key Correlations:
+   • Highest correlation: {corr_matrix.unstack().sort_values(ascending=False).drop_duplicates().head(3).to_dict() if len(corr_matrix)>0 else 'N/A'}
+
+4. Recommendations:
+   • Handle missing values in columns with high missing percentage
+   • Consider feature engineering based on strong correlations
+   • Investigate outliers in price, horsepower, and engine-size
+""")
