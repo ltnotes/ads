@@ -1,103 +1,227 @@
-# Q4_time_series_forecasting.py
+# Q17_attendance_timeseries.py
 """
-QUESTION 4: Time Series Forecasting on Airline Passengers
-Dataset: international-airline-passengers.csv
+QUESTION 17: Student Attendance Time Series Analysis
+Dataset: 2018-2019_Daily_Attendance_20240429.csv
 """
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import warnings
 warnings.filterwarnings('ignore')
 
 # Load data
-df = pd.read_csv("international-airline-passengers.csv", skiprows=0, header=0)
-df.columns = ["Month", "Passengers"]
-df = df.dropna()
-df["Passengers"] = pd.to_numeric(df["Passengers"], errors="coerce")
-df = df.dropna()
-df["Month"] = pd.to_datetime(df["Month"])
-df = df.set_index("Month")
-series = df["Passengers"].asfreq("MS")
+df = pd.read_csv("2018-2019_Daily_Attendance_20240429.csv")
+df.columns = df.columns.str.strip()
+
+print("\n" + "="*70)
+print("STUDENT ATTENDANCE TIME SERIES ANALYSIS")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Columns: {df.columns.tolist()}")
+
+# Parse date
+try:
+    df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%Y%m%d", errors="coerce")
+except:
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+df = df.dropna(subset=["Date"])
+df = df.sort_values("Date")
+
+print(f"\nDate range: {df['Date'].min()} to {df['Date'].max()}")
+print(f"Total records: {len(df)}")
+
+# Aggregate daily attendance
+daily = df.groupby("Date").agg({
+    "Enrolled": "sum",
+    "Present": "sum", 
+    "Absent": "sum"
+}).reset_index()
+
+daily["AttendancePct"] = (daily["Present"] / daily["Enrolled"] * 100).round(2)
+daily["Rolling7"] = daily["AttendancePct"].rolling(window=7, min_periods=1).mean()
+daily["Rolling30"] = daily["AttendancePct"].rolling(window=30, min_periods=1).mean()
 
 print("\n" + "="*60)
-print("TIME SERIES ANALYSIS")
+print("ATTENDANCE STATISTICS")
 print("="*60)
-print(f"Date range: {series.index[0]} to {series.index[-1]}")
-print(f"Total observations: {len(series)}")
-print(f"Monthly passengers - Mean: {series.mean():.0f}, Std: {series.std():.0f}")
+print(f"Average daily attendance: {daily['AttendancePct'].mean():.2f}%")
+print(f"Attendance range: {daily['AttendancePct'].min():.2f}% - {daily['AttendancePct'].max():.2f}%")
+print(f"Days with attendance < 70%: {(daily['AttendancePct'] < 70).sum()}")
+print(f"Days with attendance > 90%: {(daily['AttendancePct'] > 90).sum()}")
 
-# Time Series Decomposition
+# Monthly aggregation
+daily_index = daily.set_index("Date")
+monthly = daily_index.resample("ME").agg({
+    "AttendancePct": "mean",
+    "Present": "sum",
+    "Absent": "sum"
+}).round(2)
+
+print("\nMonthly average attendance (%):")
+print(monthly["AttendancePct"].to_string())
+
+# Weekly patterns
+daily["DayOfWeek"] = daily["Date"].dt.day_name()
+weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+daily["DayOfWeek"] = pd.Categorical(daily["DayOfWeek"], categories=weekday_order, ordered=True)
+weekly_avg = daily.groupby("DayOfWeek")["AttendancePct"].agg(['mean', 'std'])
+
 print("\n" + "="*60)
-print("SEASONAL DECOMPOSITION")
+print("WEEKLY PATTERNS")
 print("="*60)
-decomposition = seasonal_decompose(series, model="multiplicative")
+print(weekly_avg)
 
-fig, axes = plt.subplots(4, 1, figsize=(14, 12))
-series.plot(ax=axes[0], color="steelblue", linewidth=1)
-axes[0].set_title("Original Time Series - Airline Passengers", fontsize=12, fontweight='bold')
-axes[0].set_ylabel("Passengers")
-axes[0].grid(True, alpha=0.3)
+# Time series decomposition (if enough data)
+try:
+    if len(daily) >= 30:
+        # Resample to daily frequency
+        ts = daily.set_index("Date")["AttendancePct"].asfreq("D").fillna(method="ffill")
+        
+        # Decompose (using additive model)
+        decomposition = seasonal_decompose(ts, model="additive", period=7)
+        
+        fig, axes = plt.subplots(4, 1, figsize=(14, 12))
+        
+        ts.plot(ax=axes[0], color="steelblue", linewidth=1)
+        axes[0].set_title("Original Attendance Time Series", fontsize=12, fontweight='bold')
+        axes[0].set_ylabel("Attendance %")
+        axes[0].grid(True, alpha=0.3)
+        
+        decomposition.trend.plot(ax=axes[1], color="green", linewidth=1)
+        axes[1].set_title("Trend Component", fontsize=12, fontweight='bold')
+        axes[1].set_ylabel("Attendance %")
+        axes[1].grid(True, alpha=0.3)
+        
+        decomposition.seasonal.plot(ax=axes[2], color="orange", linewidth=1)
+        axes[2].set_title("Seasonal Component (Weekly)", fontsize=12, fontweight='bold')
+        axes[2].set_ylabel("Seasonal Effect")
+        axes[2].grid(True, alpha=0.3)
+        
+        decomposition.resid.plot(ax=axes[3], color="red", linewidth=1)
+        axes[3].set_title("Residual Component (Noise)", fontsize=12, fontweight='bold')
+        axes[3].set_ylabel("Residual")
+        axes[3].grid(True, alpha=0.3)
+        
+        plt.suptitle("Attendance Time Series Decomposition", fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        plt.show()
+except Exception as e:
+    print(f"Decomposition skipped: {e}")
 
-decomposition.trend.plot(ax=axes[1], color="green", linewidth=1)
-axes[1].set_title("Trend Component", fontsize=12, fontweight='bold')
-axes[1].set_ylabel("Passengers")
-axes[1].grid(True, alpha=0.3)
+# Visualizations
+fig = plt.figure(figsize=(16, 14))
 
-decomposition.seasonal.plot(ax=axes[2], color="orange", linewidth=1)
-axes[2].set_title("Seasonal Component", fontsize=12, fontweight='bold')
-axes[2].set_ylabel("Seasonal Effect")
-axes[2].grid(True, alpha=0.3)
+# 1. Daily Attendance with Rolling Averages
+ax1 = plt.subplot(3, 2, 1)
+ax1.plot(daily["Date"], daily["AttendancePct"], alpha=0.5, linewidth=0.8, label="Daily", color="steelblue")
+ax1.plot(daily["Date"], daily["Rolling7"], linewidth=2, label="7-Day Average", color="orange")
+ax1.plot(daily["Date"], daily["Rolling30"], linewidth=2, label="30-Day Average", color="red")
+ax1.set_title("Daily Attendance with Rolling Averages", fontsize=12, fontweight='bold')
+ax1.set_xlabel("Date")
+ax1.set_ylabel("Attendance (%)")
+ax1.legend()
+ax1.grid(True, alpha=0.3)
 
-decomposition.resid.plot(ax=axes[3], color="red", linewidth=1)
-axes[3].set_title("Residual Component (Noise)", fontsize=12, fontweight='bold')
-axes[3].set_ylabel("Residual")
-axes[3].grid(True, alpha=0.3)
+# 2. Monthly Average Attendance
+ax2 = plt.subplot(3, 2, 2)
+monthly["AttendancePct"].plot(kind="bar", ax=ax2, color="lightgreen", edgecolor="black")
+ax2.set_title("Monthly Average Attendance", fontsize=12, fontweight='bold')
+ax2.set_xlabel("Month")
+ax2.set_ylabel("Attendance (%)")
+ax2.tick_params(axis='x', rotation=45)
+ax2.axhline(y=daily["AttendancePct"].mean(), color='red', linestyle='--', label=f"Overall Avg: {daily['AttendancePct'].mean():.1f}%")
+ax2.legend()
+ax2.grid(True, alpha=0.3, axis='y')
 
+# 3. Weekly Pattern
+ax3 = plt.subplot(3, 2, 3)
+weekly_avg["mean"].plot(kind="bar", ax=ax3, color="lightblue", edgecolor="black", yerr=weekly_avg["std"], capsize=5)
+ax3.set_title("Average Attendance by Day of Week", fontsize=12, fontweight='bold')
+ax3.set_xlabel("Day")
+ax3.set_ylabel("Attendance (%)")
+ax3.axhline(y=daily["AttendancePct"].mean(), color='red', linestyle='--', label=f"Overall Avg: {daily['AttendancePct'].mean():.1f}%")
+ax3.legend()
+ax3.grid(True, alpha=0.3, axis='y')
+
+# 4. Attendance Distribution
+ax4 = plt.subplot(3, 2, 4)
+ax4.hist(daily["AttendancePct"], bins=30, color="steelblue", edgecolor="black", alpha=0.7)
+ax4.axvline(x=daily["AttendancePct"].mean(), color='red', linestyle='--', linewidth=2, label=f"Mean: {daily['AttendancePct'].mean():.1f}%")
+ax4.axvline(x=daily["AttendancePct"].median(), color='green', linestyle='--', linewidth=2, label=f"Median: {daily['AttendancePct'].median():.1f}%")
+ax4.set_title("Attendance Distribution", fontsize=12, fontweight='bold')
+ax4.set_xlabel("Attendance (%)")
+ax4.set_ylabel("Frequency")
+ax4.legend()
+ax4.grid(True, alpha=0.3)
+
+# 5. Present vs Absent Over Time
+ax5 = plt.subplot(3, 2, 5)
+ax5.plot(daily["Date"], daily["Present"], label="Present", color="green", linewidth=1)
+ax5.plot(daily["Date"], daily["Absent"], label="Absent", color="red", linewidth=1)
+ax5.set_title("Present vs Absent Students Over Time", fontsize=12, fontweight='bold')
+ax5.set_xlabel("Date")
+ax5.set_ylabel("Number of Students")
+ax5.legend()
+ax5.grid(True, alpha=0.3)
+
+# 6. Low Attendance Detection
+ax6 = plt.subplot(3, 2, 6)
+low_attendance = daily[daily["AttendancePct"] < 70]
+ax6.scatter(low_attendance["Date"], low_attendance["AttendancePct"], 
+            color="red", s=50, alpha=0.6, label="Low Attendance (<70%)")
+ax6.scatter(daily["Date"], daily["AttendancePct"], color="steelblue", alpha=0.3, s=20, label="Normal")
+ax6.axhline(y=70, color='orange', linestyle='--', linewidth=2, label="70% Threshold")
+ax6.set_title(f"Low Attendance Detection ({len(low_attendance)} days)", fontsize=12, fontweight='bold')
+ax6.set_xlabel("Date")
+ax6.set_ylabel("Attendance (%)")
+ax6.legend()
+ax6.grid(True, alpha=0.3)
+
+plt.suptitle("Student Attendance Analysis - 2018/2019 Academic Year", fontsize=16, fontweight='bold')
 plt.tight_layout()
 plt.show()
 
-# Holt-Winters Forecasting
-print("\n" + "="*60)
-print("HOLT-WINTERS FORECASTING")
-print("="*60)
+# Anomaly detection
+print("\n" + "="*70)
+print("ANOMALY DETECTION (Attendance < 70%)")
+print("="*70)
+if len(low_attendance) > 0:
+    print(f"\nFound {len(low_attendance)} days with attendance below 70%:")
+    print(low_attendance[["Date", "AttendancePct", "Present", "Absent", "Enrolled"]].head(10).to_string(index=False))
+    if len(low_attendance) > 10:
+        print(f"\n... and {len(low_attendance) - 10} more days")
+else:
+    print("No low attendance days found")
 
-model = ExponentialSmoothing(series, seasonal="mul", trend="add", seasonal_periods=12)
-fitted_model = model.fit()
-forecast_24 = fitted_model.forecast(24)
+# Correlation analysis
+print("\n" + "="*70)
+print("CORRELATION ANALYSIS")
+print("="*70)
+correlation = daily[["AttendancePct", "Present", "Absent", "Enrolled"]].corr()
+print(correlation)
 
-print("\nForecast for next 24 months:")
-print("-"*40)
-for i, (date, value) in enumerate(forecast_24.items()):
-    if i < 12:
-        print(f"{date.strftime('%Y-%m')}: {value:.0f} passengers")
-    elif i == 12:
-        print("\nYear 2:")
-    if i >= 12:
-        print(f"{date.strftime('%Y-%m')}: {value:.0f} passengers")
+print("\n" + "="*70)
+print("KEY FINDINGS & RECOMMENDATIONS")
+print("="*70)
+print(f"""
+1. Overall Attendance:
+   • Average: {daily['AttendancePct'].mean():.2f}%
+   • Range: {daily['AttendancePct'].min():.2f}% - {daily['AttendancePct'].max():.2f}%
 
-# Plot forecast
-fig, ax = plt.subplots(figsize=(14, 6))
-series.plot(ax=ax, label="Historical Data", color="steelblue", linewidth=2)
-forecast_24.plot(ax=ax, label="24-Month Forecast", color="tomato", linewidth=2, linestyle="--")
-ax.fill_between(forecast_24.index, forecast_24 - fitted_model.resid.std(), 
-                 forecast_24 + fitted_model.resid.std(), alpha=0.2, color="tomato")
-ax.set_title("Airline Passengers - Holt-Winters Forecast", fontsize=14, fontweight='bold')
-ax.set_xlabel("Year")
-ax.set_ylabel("Number of Passengers")
-ax.legend(fontsize=10)
-ax.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.show()
+2. Temporal Patterns:
+   • Best attendance day: {weekly_avg['mean'].idxmax()} ({weekly_avg['mean'].max():.2f}%)
+   • Worst attendance day: {weekly_avg['mean'].idxmin()} ({weekly_avg['mean'].min():.2f}%)
 
-print("\n" + "="*60)
-print("INSIGHTS")
-print("="*60)
-print("""
-1. STRONG SEASONALITY: Clear annual pattern with peaks in summer months
-2. UPWARD TREND: Consistent growth in air travel over the years
-3. FORECAST: Expect continued growth with seasonal variations
-4. BUSINESS IMPACT: Airlines should increase capacity during peak months
+3. Anomalies:
+   • {len(low_attendance)} days with attendance below 70%
+   • These require investigation (holidays, weather, events?)
+
+4. Recommendations:
+   • Implement intervention programs for low attendance days
+   • Schedule important activities on high-attendance days
+   • Investigate causes of attendance drops
+   • Consider incentives for improving attendance
 """)
