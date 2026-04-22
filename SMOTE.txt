@@ -1,0 +1,104 @@
+# Q2_smote_diabetes.py
+"""
+QUESTION 2: SMOTE Technique on Diabetes Dataset
+Dataset: diabetes.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from imblearn.over_sampling import SMOTE
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score, classification_report, confusion_matrix
+import seaborn as sns
+
+# Load data
+df = pd.read_csv("diabetes.csv")
+X = df.drop("Outcome", axis=1)
+y = df["Outcome"]
+
+print("\n" + "="*60)
+print("CLASS DISTRIBUTION ANALYSIS")
+print("="*60)
+print("Before SMOTE:")
+print(y.value_counts())
+print(f"\nClass 0 (No Diabetes): { (y==0).sum() } samples")
+print(f"Class 1 (Diabetes): { (y==1).sum() } samples")
+print(f"Imbalance Ratio: {(y==0).sum()/(y==1).sum():.2f}:1")
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train model BEFORE SMOTE
+print("\n" + "="*60)
+print("MODEL PERFORMANCE - BEFORE SMOTE")
+print("="*60)
+clf_before = RandomForestClassifier(random_state=42)
+clf_before.fit(X_train, y_train)
+y_pred_before = clf_before.predict(X_test)
+f1_before = f1_score(y_test, y_pred_before)
+print(f"F1-Score: {f1_before:.4f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred_before))
+
+# Apply SMOTE
+print("\n" + "="*60)
+print("APPLYING SMOTE")
+print("="*60)
+sm = SMOTE(random_state=42)
+X_resampled, y_resampled = sm.fit_resample(X_train, y_train)
+print("After SMOTE:")
+print(pd.Series(y_resampled).value_counts())
+
+# Train model AFTER SMOTE
+print("\n" + "="*60)
+print("MODEL PERFORMANCE - AFTER SMOTE")
+print("="*60)
+clf_after = RandomForestClassifier(random_state=42)
+clf_after.fit(X_resampled, y_resampled)
+y_pred_after = clf_after.predict(X_test)
+f1_after = f1_score(y_test, y_pred_after)
+print(f"F1-Score: {f1_after:.4f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred_after))
+
+# Visualizations
+fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+
+# Class distribution before
+axes[0].bar(["Class 0\n(No Diabetes)", "Class 1\n(Diabetes)"], 
+            y_train.value_counts().sort_index(), 
+            color=["steelblue", "tomato"])
+axes[0].set_title("Before SMOTE", fontsize=12, fontweight='bold')
+axes[0].set_ylabel("Count")
+
+# Class distribution after
+axes[1].bar(["Class 0\n(No Diabetes)", "Class 1\n(Diabetes)"], 
+            pd.Series(y_resampled).value_counts().sort_index(), 
+            color=["steelblue", "tomato"])
+axes[1].set_title("After SMOTE", fontsize=12, fontweight='bold')
+axes[1].set_ylabel("Count")
+
+# F1 Score comparison
+axes[2].bar(["Before SMOTE", "After SMOTE"], [f1_before, f1_after], 
+            color=["orange", "green"])
+axes[2].set_title("F1 Score Comparison", fontsize=12, fontweight='bold')
+axes[2].set_ylabel("F1 Score")
+axes[2].axhline(y=f1_before, color='orange', linestyle='--', alpha=0.5)
+axes[2].axhline(y=f1_after, color='green', linestyle='--', alpha=0.5)
+
+plt.suptitle("SMOTE Impact on Diabetes Classification", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("CONCLUSION")
+print("="*60)
+if f1_after > f1_before:
+    print(f"✓ SMOTE improved F1-score by {(f1_after-f1_before)*100:.2f}%")
+    print("  SMOTE successfully generated synthetic minority samples")
+    print("  helping the model learn the minority class better.")
+else:
+    print("✗ SMOTE did not improve F1-score")
+    print("  Dataset may already be balanced enough")
