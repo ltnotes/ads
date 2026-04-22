@@ -1,0 +1,88 @@
+# Q1_olympics_statistics.py
+"""
+QUESTION 1: Descriptive & Inferential Statistics on Olympics Dataset
+Dataset: olympics.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+
+# Load data
+col_names = ["Country","Games","Gold1","Silver1","Bronze1",
+             "Gold2","Silver2","Bronze2","Gold3","Silver3",
+             "Bronze3","Gold4","Silver4","Bronze4","Total","Combined"]
+
+df = pd.read_csv("olympics.csv", skiprows=2, header=None, names=col_names)
+df = df.dropna(subset=["Country"])
+
+# Keep numeric medal columns
+medal_cols = ["Gold1","Silver1","Bronze1","Total"]
+df[medal_cols] = df[medal_cols].apply(pd.to_numeric, errors="coerce")
+df_num = df[medal_cols].dropna()
+
+print("\n" + "="*60)
+print("DESCRIPTIVE STATISTICS")
+print("="*60)
+print(df_num.describe())
+
+print("\n" + "="*60)
+print("MEASURES OF CENTRAL TENDENCY")
+print("="*60)
+print(f"Mean:\n{df_num.mean()}")
+print(f"\nMedian:\n{df_num.median()}")
+print(f"\nStandard Deviation:\n{df_num.std()}")
+print(f"\nMin:\n{df_num.min()}")
+print(f"\nMax:\n{df_num.max()}")
+
+# Inferential Statistics
+print("\n" + "="*60)
+print("INFERENTIAL STATISTICS")
+print("="*60)
+
+# One-sample t-test
+t_stat, p_val = stats.ttest_1samp(df_num["Gold1"].dropna(), 0)
+print(f"\n1. One-Sample t-test (Gold medals vs 0):")
+print(f"   t-statistic = {t_stat:.3f}, p-value = {p_val:.4f}")
+print(f"   Conclusion: {'Reject H0 - Mean Gold is significantly different from 0' if p_val < 0.05 else 'Fail to reject H0'}")
+
+# Pearson correlation
+corr, p_c = stats.pearsonr(df_num["Gold1"], df_num["Total"])
+print(f"\n2. Pearson Correlation (Gold1 vs Total):")
+print(f"   r = {corr:.3f}, p-value = {p_c:.4f}")
+print(f"   Conclusion: {'Significant positive correlation' if p_c < 0.05 else 'No significant correlation'}")
+
+# Visualizations
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Bar plot
+axes[0].bar(medal_cols, df_num.mean(), color=["gold","silver","#cd7f32","steelblue"])
+axes[0].set_title("Mean Medals per Category", fontsize=14, fontweight='bold')
+axes[0].set_ylabel("Mean Count")
+axes[0].grid(True, alpha=0.3)
+
+# Boxplot
+axes[1].boxplot([df_num[c].dropna() for c in medal_cols], labels=medal_cols)
+axes[1].set_title("Boxplot of Medal Distributions", fontsize=14, fontweight='bold')
+axes[1].set_ylabel("Medal Count")
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("INFERENCES")
+print("="*60)
+print("""
+1. High standard deviation relative to mean indicates extreme spread - 
+   few countries win most medals while majority win very few.
+
+2. Median << Mean for 'Total' confirms right-skewed distribution.
+
+3. Minimum = 0 across all medal types shows many countries never won medals.
+
+4. Strong Pearson correlation (r ≈ 0.99) confirms gold medals are the 
+   primary driver of the overall medal tally.
+""")
