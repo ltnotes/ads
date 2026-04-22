@@ -1,0 +1,106 @@
+# Q8_data_imputation.py
+"""
+QUESTION 8: Data Imputation on Automobile Dataset
+Dataset: Automobile_data.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load data
+df = pd.read_csv("Automobile_data.csv")
+df.replace("?", np.nan, inplace=True)
+
+print("\n" + "="*60)
+print("DATA IMPUTATION - AUTOMOBILE DATASET")
+print("="*60)
+
+# Check missing values before
+print("\n" + "="*60)
+print("BEFORE IMPUTATION")
+print("="*60)
+missing_before = df.isnull().sum()
+missing_cols = missing_before[missing_before > 0]
+print(f"Total rows: {len(df)}")
+print(f"Columns with missing values: {len(missing_cols)}")
+print("\nMissing values per column:")
+for col, count in missing_cols.items():
+    print(f"  • {col}: {count} missing ({count/len(df)*100:.1f}%)")
+
+# Convert columns to numeric where possible
+for col in df.columns:
+    try:
+        df[col] = pd.to_numeric(df[col])
+    except (ValueError, TypeError):
+        pass
+
+# Imputation
+print("\n" + "="*60)
+print("IMPUTATION STRATEGIES")
+print("="*60)
+
+# Numeric columns - Median imputation
+numeric_cols = df.select_dtypes(include=[np.number]).columns
+for col in numeric_cols:
+    if df[col].isnull().sum() > 0:
+        median_val = df[col].median()
+        df[col].fillna(median_val, inplace=True)
+        print(f"  • {col}: Imputed with median ({median_val:.2f})")
+
+# Categorical columns - Mode imputation
+cat_cols = df.select_dtypes(exclude=[np.number]).columns
+for col in cat_cols:
+    if df[col].isnull().sum() > 0:
+        mode_val = df[col].mode()[0]
+        df[col].fillna(mode_val, inplace=True)
+        print(f"  • {col}: Imputed with mode ({mode_val})")
+
+# Check after imputation
+print("\n" + "="*60)
+print("AFTER IMPUTATION")
+print("="*60)
+missing_after = df.isnull().sum()
+remaining_missing = missing_after[missing_after > 0]
+if len(remaining_missing) == 0:
+    print("✓ No missing values remaining!")
+else:
+    print(f"Remaining missing values: {remaining_missing.sum()}")
+
+print(f"Final dataset shape: {df.shape}")
+
+# Visualization
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Before imputation
+axes[0].bar(missing_cols.index, missing_cols.values, color="tomato", alpha=0.7)
+axes[0].set_title("Missing Values Before Imputation", fontsize=12, fontweight='bold')
+axes[0].set_xlabel("Features")
+axes[0].set_ylabel("Number of Missing Values")
+axes[0].tick_params(axis='x', rotation=45)
+axes[0].grid(True, alpha=0.3, axis='y')
+
+# After imputation - show zeros
+axes[1].bar(missing_cols.index, [0]*len(missing_cols), color="green", alpha=0.7)
+axes[1].set_title("Missing Values After Imputation", fontsize=12, fontweight='bold')
+axes[1].set_xlabel("Features")
+axes[1].set_ylabel("Number of Missing Values")
+axes[1].tick_params(axis='x', rotation=45)
+axes[1].grid(True, alpha=0.3, axis='y')
+
+plt.suptitle("Data Imputation Results", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("SUMMARY")
+print("="*60)
+print(f"""
+Imputation completed successfully:
+• Total missing values before: {missing_before.sum()}
+• Total missing values after: {missing_after.sum()}
+• Imputation methods used:
+  - Numeric features: Median imputation (robust to outliers)
+  - Categorical features: Mode imputation (most frequent value)
+• Data is now complete and ready for analysis
+""")
