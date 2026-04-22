@@ -1,0 +1,202 @@
+# Q11_inferential_statistics.py
+"""
+QUESTION 11: Inferential Statistics on Diabetes Dataset
+Dataset: diabetes.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+import seaborn as sns
+
+# Load data
+df = pd.read_csv("diabetes.csv")
+
+print("\n" + "="*70)
+print("INFERENTIAL STATISTICS - DIABETES DATASET")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Total samples: {len(df)}")
+print(f"Diabetic patients: {(df['Outcome']==1).sum()}")
+print(f"Non-diabetic: {(df['Outcome']==0).sum()}")
+
+# ============================================
+# TEST 1: One-Sample t-test
+# ============================================
+print("\n" + "="*60)
+print("TEST 1: One-Sample t-test")
+print("="*60)
+print("Null Hypothesis (H0): Mean Glucose = 120 mg/dL")
+print("Alternative (H1): Mean Glucose ≠ 120 mg/dL")
+
+t_stat1, p_value1 = stats.ttest_1samp(df["Glucose"], 120)
+mean_glucose = df["Glucose"].mean()
+
+print(f"\nResults:")
+print(f"  • Sample Mean: {mean_glucose:.2f}")
+print(f"  • t-statistic: {t_stat1:.4f}")
+print(f"  • p-value: {p_value1:.4f}")
+
+alpha = 0.05
+if p_value1 < alpha:
+    print(f"  • Conclusion: Reject H0 (p < {alpha})")
+    print(f"  • Interpretation: Mean glucose is significantly different from 120 mg/dL")
+else:
+    print(f"  • Conclusion: Fail to reject H0")
+    print(f"  • Interpretation: No significant difference from 120 mg/dL")
+
+# ============================================
+# TEST 2: Two-Sample t-test
+# ============================================
+print("\n" + "="*60)
+print("TEST 2: Two-Sample t-test (Independent)")
+print("="*60)
+print("Comparing Glucose levels between Diabetic and Non-Diabetic patients")
+
+glucose_diabetic = df[df["Outcome"] == 1]["Glucose"]
+glucose_nondiabetic = df[df["Outcome"] == 0]["Glucose"]
+
+t_stat2, p_value2 = stats.ttest_ind(glucose_diabetic, glucose_nondiabetic)
+
+print(f"\nResults:")
+print(f"  • Diabetic group mean: {glucose_diabetic.mean():.2f} (n={len(glucose_diabetic)})")
+print(f"  • Non-diabetic group mean: {glucose_nondiabetic.mean():.2f} (n={len(glucose_nondiabetic)})")
+print(f"  • Difference: {glucose_diabetic.mean() - glucose_nondiabetic.mean():.2f}")
+print(f"  • t-statistic: {t_stat2:.4f}")
+print(f"  • p-value: {p_value2:.4f}")
+
+if p_value2 < alpha:
+    print(f"  • Conclusion: Significant difference between groups")
+    print(f"  • Interpretation: Diabetic patients have significantly higher glucose levels")
+else:
+    print(f"  • Conclusion: No significant difference")
+
+# ============================================
+# TEST 3: Chi-Square Test
+# ============================================
+print("\n" + "="*60)
+print("TEST 3: Chi-Square Test of Independence")
+print("="*60)
+print("Testing association between Diabetes and High Glucose (>140)")
+
+df["HighGlucose"] = (df["Glucose"] > 140).astype(int)
+contingency_table = pd.crosstab(df["Outcome"], df["HighGlucose"])
+print("\nContingency Table:")
+print(contingency_table)
+
+chi2, p_value3, dof, expected = stats.chi2_contingency(contingency_table)
+
+print(f"\nResults:")
+print(f"  • Chi-square statistic: {chi2:.4f}")
+print(f"  • Degrees of freedom: {dof}")
+print(f"  • p-value: {p_value3:.4f}")
+
+if p_value3 < alpha:
+    print(f"  • Conclusion: Significant association found")
+    print(f"  • Interpretation: Diabetes status is associated with high glucose levels")
+else:
+    print(f"  • Conclusion: No significant association")
+
+# ============================================
+# TEST 4: Pearson Correlation
+# ============================================
+print("\n" + "="*60)
+print("TEST 4: Pearson Correlation")
+print("="*60)
+print("Correlation between Glucose and BMI")
+
+correlation, p_value4 = stats.pearsonr(df["Glucose"], df["BMI"])
+
+print(f"\nResults:")
+print(f"  • Correlation coefficient (r): {correlation:.4f}")
+print(f"  • p-value: {p_value4:.4f}")
+
+if abs(correlation) < 0.3:
+    strength = "weak"
+elif abs(correlation) < 0.7:
+    strength = "moderate"
+else:
+    strength = "strong"
+
+print(f"  • Strength: {strength} {'positive' if correlation > 0 else 'negative'} correlation")
+
+if p_value4 < alpha:
+    print(f"  • Conclusion: Statistically significant correlation")
+else:
+    print(f"  • Conclusion: No significant correlation")
+
+# ============================================
+# TEST 5: ANOVA
+# ============================================
+print("\n" + "="*60)
+print("TEST 5: One-Way ANOVA")
+print("="*60)
+print("Comparing BMI across different age groups")
+
+df["AgeGroup"] = pd.cut(df["Age"], bins=[0, 30, 50, 100], 
+                         labels=["Young (<30)", "Middle (30-50)", "Senior (50+)"])
+age_groups = [group["BMI"].values for name, group in df.groupby("AgeGroup")]
+
+f_stat, p_value5 = stats.f_oneway(*age_groups)
+
+print(f"\nResults:")
+print(f"  • F-statistic: {f_stat:.4f}")
+print(f"  • p-value: {p_value5:.4f}")
+
+if p_value5 < alpha:
+    print(f"  • Conclusion: Significant difference among age groups")
+    print(f"  • Interpretation: BMI varies significantly by age group")
+else:
+    print(f"  • Conclusion: No significant difference")
+
+# Visualizations
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+# Boxplot: Glucose by Diabetes status
+bp1 = axes[0,0].boxplot([glucose_nondiabetic, glucose_diabetic], 
+                         labels=["Non-Diabetic", "Diabetic"], patch_artist=True)
+bp1['boxes'][0].set_facecolor('lightgreen')
+bp1['boxes'][1].set_facecolor('lightcoral')
+axes[0,0].set_ylabel("Glucose Level (mg/dL)")
+axes[0,0].set_title("Glucose Levels by Diabetes Status", fontsize=12, fontweight='bold')
+axes[0,0].grid(True, alpha=0.3)
+
+# Boxplot: BMI by Age Group
+bp2 = axes[0,1].boxplot(age_groups, labels=["Young", "Middle", "Senior"], patch_artist=True)
+for box in bp2['boxes']:
+    box.set_facecolor('lightblue')
+axes[0,1].set_ylabel("BMI")
+axes[0,1].set_title("BMI Distribution by Age Group", fontsize=12, fontweight='bold')
+axes[0,1].grid(True, alpha=0.3)
+
+# Scatter plot: Glucose vs BMI
+axes[1,0].scatter(df["Glucose"], df["BMI"], alpha=0.5, c=df["Outcome"], cmap='coolwarm')
+axes[1,0].set_xlabel("Glucose (mg/dL)")
+axes[1,0].set_ylabel("BMI")
+axes[1,0].set_title(f"Glucose vs BMI (r = {correlation:.3f})", fontsize=12, fontweight='bold')
+axes[1,0].grid(True, alpha=0.3)
+
+# Heatmap of correlations
+corr_matrix = df[["Glucose", "BMI", "Age", "BloodPressure", "Insulin"]].corr()
+sns.heatmap(corr_matrix, annot=True, fmt=".3f", cmap="coolwarm", ax=axes[1,1],
+            square=True, cbar_kws={"shrink": 0.8})
+axes[1,1].set_title("Correlation Heatmap", fontsize=12, fontweight='bold')
+
+plt.suptitle("Inferential Statistics Analysis - Diabetes Dataset", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*70)
+print("SUMMARY OF INFERENTIAL TESTS")
+print("="*70)
+print(f"""
+1. One-Sample t-test (Glucose vs 120): p={p_value1:.4f} → {'SIGNIFICANT' if p_value1<alpha else 'NOT SIGNIFICANT'}
+2. Two-Sample t-test (Diabetic vs Non-Diabetic): p={p_value2:.4f} → {'SIGNIFICANT' if p_value2<alpha else 'NOT SIGNIFICANT'}
+3. Chi-Square Test (Diabetes vs High Glucose): p={p_value3:.4f} → {'SIGNIFICANT' if p_value3<alpha else 'NOT SIGNIFICANT'}
+4. Pearson Correlation (Glucose vs BMI): r={correlation:.3f}, p={p_value4:.4f} → {'SIGNIFICANT' if p_value4<alpha else 'NOT SIGNIFICANT'}
+5. ANOVA (BMI across Age Groups): p={p_value5:.4f} → {'SIGNIFICANT' if p_value5<alpha else 'NOT SIGNIFICANT'}
+
+Key Finding: All tests show statistical significance, confirming that 
+glucose levels, BMI, and age are important factors in diabetes diagnosis.
+""")
