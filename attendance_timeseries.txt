@@ -1,0 +1,68 @@
+# Q17_attendance_timeseries.py
+"""
+QUESTION 17: Student Attendance Time Series Analysis
+Dataset: 2018-2019_Daily_Attendance_20240429.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import seasonal_decompose
+import warnings
+warnings.filterwarnings('ignore')
+
+# Load data
+df = pd.read_csv("2018-2019_Daily_Attendance_20240429.csv")
+df.columns = df.columns.str.strip()
+
+print("\n" + "="*70)
+print("STUDENT ATTENDANCE TIME SERIES ANALYSIS")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Columns: {df.columns.tolist()}")
+
+# Parse date
+try:
+    df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%Y%m%d", errors="coerce")
+except:
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+df = df.dropna(subset=["Date"])
+df = df.sort_values("Date")
+
+print(f"\nDate range: {df['Date'].min()} to {df['Date'].max()}")
+print(f"Total records: {len(df)}")
+
+# Aggregate daily attendance
+daily = df.groupby("Date").agg({
+    "Enrolled": "sum",
+    "Present": "sum", 
+    "Absent": "sum"
+}).reset_index()
+
+daily["AttendancePct"] = (daily["Present"] / daily["Enrolled"] * 100).round(2)
+daily["Rolling7"] = daily["AttendancePct"].rolling(window=7, min_periods=1).mean()
+daily["Rolling30"] = daily["AttendancePct"].rolling(window=30, min_periods=1).mean()
+
+print("\n" + "="*60)
+print("ATTENDANCE STATISTICS")
+print("="*60)
+print(f"Average daily attendance: {daily['AttendancePct'].mean():.2f}%")
+print(f"Attendance range: {daily['AttendancePct'].min():.2f}% - {daily['AttendancePct'].max():.2f}%")
+print(f"Days with attendance < 70%: {(daily['AttendancePct'] < 70).sum()}")
+print(f"Days with attendance > 90%: {(daily['AttendancePct'] > 90).sum()}")
+
+# Monthly aggregation
+daily_index = daily.set_index("Date")
+monthly = daily_index.resample("ME").agg({
+    "AttendancePct": "mean",
+    "Present": "sum",
+    "Absent": "sum"
+}).round(2)
+
+print("\nMonthly average attendance (%):")
+print(monthly["AttendancePct"].to_string())
+
+# Weekly patterns
+daily["DayOfWeek"] = daily["Date"].dt.day_name()
+weekday_order =
