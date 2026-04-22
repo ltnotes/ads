@@ -1,0 +1,198 @@
+# Q15_validation_techniques.py
+"""
+QUESTION 15: Validation Techniques & Evaluation Metrics on Diabetes Dataset
+Dataset: diabetes.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import (train_test_split, cross_val_score, 
+                                     StratifiedKFold, LeaveOneOut, KFold)
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (accuracy_score, precision_score, recall_score,
+                            f1_score, roc_auc_score, roc_curve,
+                            confusion_matrix, ConfusionMatrixDisplay)
+
+# Load data
+df = pd.read_csv("diabetes.csv")
+X = df.drop("Outcome", axis=1)
+y = df["Outcome"]
+
+# Scale features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print("\n" + "="*70)
+print("VALIDATION TECHNIQUES - DIABETES PREDICTION")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Features: {list(X.columns)}")
+print(f"Class distribution:\n{y.value_counts()}")
+
+# ============================================
+# METHOD 1: Hold-Out Validation
+# ============================================
+print("\n" + "="*60)
+print("METHOD 1: HOLD-OUT VALIDATION (80/20 Split)")
+print("="*60)
+
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, 
+                                                    test_size=0.2, 
+                                                    random_state=42,
+                                                    stratify=y)
+
+model = LogisticRegression(max_iter=1000, random_state=42)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+y_prob = model.predict_proba(X_test)[:, 1]
+
+print(f"Training set size: {len(X_train)} ({len(X_train)/len(X)*100:.0f}%)")
+print(f"Test set size: {len(X_test)} ({len(X_test)/len(X)*100:.0f}%)")
+
+print("\nPerformance Metrics:")
+print(f"  • Accuracy:  {accuracy_score(y_test, y_pred):.4f}")
+print(f"  • Precision: {precision_score(y_test, y_pred):.4f}")
+print(f"  • Recall:    {recall_score(y_test, y_pred):.4f}")
+print(f"  • F1-Score:  {f1_score(y_test, y_pred):.4f}")
+print(f"  • AUC-ROC:   {roc_auc_score(y_test, y_prob):.4f}")
+
+# ============================================
+# METHOD 2: K-Fold Cross-Validation
+# ============================================
+print("\n" + "="*60)
+print("METHOD 2: STRATIFIED 5-FOLD CROSS-VALIDATION")
+print("="*60)
+
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+cv_scores = cross_val_score(model, X_scaled, y, cv=skf, scoring='accuracy')
+
+print(f"Fold accuracies: {[f'{score:.4f}' for score in cv_scores]}")
+print(f"Mean accuracy: {cv_scores.mean():.4f} (+/- {cv_scores.std()*2:.4f})")
+
+# ============================================
+# METHOD 3: Leave-One-Out Cross-Validation
+# ============================================
+print("\n" + "="*60)
+print("METHOD 3: LEAVE-ONE-OUT CROSS-VALIDATION")
+print("="*60)
+
+# Using subset for demonstration (LOO is computationally expensive)
+sample_size = min(100, len(X_scaled))
+X_sample = X_scaled[:sample_size]
+y_sample = y[:sample_size]
+
+loo = LeaveOneOut()
+loo_scores = cross_val_score(model, X_sample, y_sample, cv=loo, scoring='accuracy')
+
+print(f"Sample size: {sample_size} (using subset due to computational cost)")
+print(f"Mean accuracy: {loo_scores.mean():.4f}")
+print(f"Standard deviation: {loo_scores.std():.4f}")
+
+# ============================================
+# METHOD 4: Different K-Values
+# ============================================
+print("\n" + "="*60)
+print("METHOD 4: COMPARING DIFFERENT K-VALUES")
+print("="*60)
+
+k_values = [3, 5, 7, 10]
+kfold_results = {}
+
+for k in k_values:
+    kfold = KFold(n_splits=k, shuffle=True, random_state=42)
+    scores = cross_val_score(model, X_scaled, y, cv=kfold, scoring='accuracy')
+    kfold_results[k] = scores
+    print(f"\n{k}-Fold Cross-Validation:")
+    print(f"  Mean accuracy: {scores.mean():.4f}")
+    print(f"  Std deviation: {scores.std():.4f}")
+    print(f"  Range: {scores.min():.4f} - {scores.max():.4f}")
+
+# Visualizations
+fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+
+# 1. Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+ConfusionMatrixDisplay(cm, display_labels=["No Diabetes", "Diabetes"]).plot(ax=axes[0,0])
+axes[0,0].set_title("Confusion Matrix (Hold-Out)", fontsize=11, fontweight='bold')
+
+# 2. ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_prob)
+auc_score = roc_auc_score(y_test, y_prob)
+axes[0,1].plot(fpr, tpr, 'b-', linewidth=2, label=f'AUC = {auc_score:.3f}')
+axes[0,1].plot([0, 1], [0, 1], 'r--', linewidth=1, label='Random Classifier')
+axes[0,1].set_xlabel("False Positive Rate")
+axes[0,1].set_ylabel("True Positive Rate")
+axes[0,1].set_title("ROC Curve", fontsize=11, fontweight='bold')
+axes[0,1].legend()
+axes[0,1].grid(True, alpha=0.3)
+
+# 3. CV Fold Accuracies (5-fold)
+axes[0,2].bar(range(1, 6), cv_scores, color='steelblue', edgecolor='black')
+axes[0,2].axhline(y=cv_scores.mean(), color='red', linestyle='--', 
+                  label=f'Mean = {cv_scores.mean():.3f}')
+axes[0,2].fill_between(range(1, 6), cv_scores.mean() - cv_scores.std(), 
+                        cv_scores.mean() + cv_scores.std(), alpha=0.2, color='red')
+axes[0,2].set_xlabel("Fold")
+axes[0,2].set_ylabel("Accuracy")
+axes[0,2].set_title("5-Fold CV Accuracies", fontsize=11, fontweight='bold')
+axes[0,2].legend()
+axes[0,2].grid(True, alpha=0.3, axis='y')
+
+# 4. K-Value Comparison
+for k, scores in kfold_results.items():
+    axes[1,0].boxplot(scores, positions=[k_values.index(k)], widths=0.6)
+axes[1,0].set_xticks(range(len(k_values)))
+axes[1,0].set_xticklabels([f'{k}-Fold' for k in k_values])
+axes[1,0].set_ylabel("Accuracy")
+axes[1,0].set_title("CV Performance by K-Value", fontsize=11, fontweight='bold')
+axes[1,0].grid(True, alpha=0.3, axis='y')
+
+# 5. Precision-Recall Trade-off
+thresholds = np.linspace(0, 1, 50)
+precisions = []
+recalls = []
+for thresh in thresholds:
+    y_pred_thresh = (y_prob >= thresh).astype(int)
+    precisions.append(precision_score(y_test, y_pred_thresh, zero_division=0))
+    recalls.append(recall_score(y_test, y_pred_thresh, zero_division=0))
+
+axes[1,1].plot(thresholds, precisions, 'b-', label='Precision', linewidth=2)
+axes[1,1].plot(thresholds, recalls, 'r-', label='Recall', linewidth=2)
+axes[1,1].set_xlabel("Threshold")
+axes[1,1].set_ylabel("Score")
+axes[1,1].set_title("Precision-Recall Trade-off", fontsize=11, fontweight='bold')
+axes[1,1].legend()
+axes[1,1].grid(True, alpha=0.3)
+
+# 6. Validation Methods Comparison
+methods = ['Hold-Out', '5-Fold CV', 'LOO (sample)']
+scores_compare = [accuracy_score(y_test, y_pred), cv_scores.mean(), loo_scores.mean()]
+errors = [0, cv_scores.std(), loo_scores.std()]
+
+axes[1,2].bar(methods, scores_compare, yerr=errors, capsize=5, 
+              color=['steelblue', 'green', 'orange'])
+axes[1,2].set_ylabel("Accuracy")
+axes[1,2].set_title("Validation Methods Comparison", fontsize=11, fontweight='bold')
+axes[1,2].grid(True, alpha=0.3, axis='y')
+
+plt.suptitle("Comprehensive Validation Techniques Analysis", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*70)
+print("SUMMARY & RECOMMENDATIONS")
+print("="*70)
+print(f"""
+Validation Method Comparison:
+• Hold-Out: {accuracy_score(y_test, y_pred):.4f} (fastest, but may be biased)
+• 5-Fold CV: {cv_scores.mean():.4f} ± {cv_scores.std():.4f} (balanced)
+• LOO: {loo_scores.mean():.4f} ± {loo_scores.std():.4f} (most accurate but computationally expensive)
+
+Recommendations:
+1. For this dataset, {cv_scores.mean():.4f} is the most reliable estimate
+2. Use stratified CV to maintain class distribution
+3. 5 or 10-fold CV provides good balance of bias and variance
+4. Model performance is stable across different validation methods
+""")
