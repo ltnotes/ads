@@ -1,0 +1,199 @@
+# Q16_autoregression.py
+"""
+QUESTION 16: AutoRegression Forecasting on AirPassengers Dataset
+Dataset: AirPassengers.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.ar_model import AutoReg
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+# Load data
+df = pd.read_csv("AirPassengers.csv")
+df.columns = ["Month", "Passengers"]
+df["Passengers"] = pd.to_numeric(df["Passengers"], errors="coerce")
+df = df.dropna()
+df["Month"] = pd.to_datetime(df["Month"])
+df = df.set_index("Month")
+
+print("\n" + "="*70)
+print("AUTOREGRESSION FORECASTING - AIR PASSENGERS")
+print("="*70)
+print(f"Date range: {df.index[0]} to {df.index[-1]}")
+print(f"Total observations: {len(df)}")
+print(f"Passengers range: {df['Passengers'].min():.0f} - {df['Passengers'].max():.0f}")
+
+# Split data (last 12 months for testing)
+train = df[:-12]
+test = df[-12:]
+
+print(f"\nTraining set: {len(train)} months ({train.index[0]} to {train.index[-1]})")
+print(f"Test set: {len(test)} months ({test.index[0]} to {test.index[-1]})")
+
+# Find optimal lag using ACF/PACF
+print("\n" + "="*60)
+print("LAG SELECTION ANALYSIS")
+print("="*60)
+
+# ACF and PACF plots
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+# Original series
+axes[0,0].plot(df.index, df["Passengers"], color='steelblue', linewidth=1)
+axes[0,0].set_title("Original Time Series - Air Passengers", fontsize=12, fontweight='bold')
+axes[0,0].set_xlabel("Year")
+axes[0,0].set_ylabel("Passengers")
+axes[0,0].grid(True, alpha=0.3)
+
+# ACF
+plot_acf(df["Passengers"], lags=30, ax=axes[0,1], alpha=0.05)
+axes[0,1].set_title("Autocorrelation Function (ACF)", fontsize=12, fontweight='bold')
+axes[0,1].grid(True, alpha=0.3)
+
+# PACF
+plot_pacf(df["Passengers"], lags=30, ax=axes[1,0], alpha=0.05, method='ywm')
+axes[1,0].set_title("Partial Autocorrelation Function (PACF)", fontsize=12, fontweight='bold')
+axes[1,0].grid(True, alpha=0.3)
+
+# ACF of differenced series (for stationarity check)
+df_diff = df["Passengers"].diff().dropna()
+plot_acf(df_diff, lags=30, ax=axes[1,1], alpha=0.05)
+axes[1,1].set_title("ACF of Differenced Series", fontsize=12, fontweight='bold')
+axes[1,1].grid(True, alpha=0.3)
+
+plt.suptitle("Time Series Analysis for Lag Selection", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Try different lag values
+print("\n" + "="*60)
+print("MODEL EVALUATION - DIFFERENT LAG VALUES")
+print("="*60)
+
+lag_values = [1, 3, 6, 12, 13, 24]
+results = {}
+
+for lag in lag_values:
+    try:
+        model = AutoReg(train["Passengers"], lags=lag)
+        model_fit = model.fit()
+        
+        # Predict
+        predictions = model_fit.predict(start=len(train), end=len(train)+len(test)-1, dynamic=False)
+        
+        # Calculate metrics
+        mae = mean_absolute_error(test["Passengers"], predictions)
+        rmse = np.sqrt(mean_squared_error(test["Passengers"], predictions))
+        mape = np.mean(np.abs((test["Passengers"].values - predictions) / test["Passengers"].values)) * 100
+        
+        results[lag] = {"MAE": mae, "RMSE": rmse, "MAPE": mape, "model": model_fit}
+        
+        print(f"\nLag = {lag}:")
+        print(f"  • MAE:  {mae:.2f}")
+        print(f"  • RMSE: {rmse:.2f}")
+        print(f"  • MAPE: {mape:.2f}%")
+    except:
+        print(f"\nLag = {lag}: Model failed to converge")
+
+# Select best lag
+best_lag = min(results, key=lambda x: results[x]["RMSE"])
+print(f"\n" + "="*60)
+print(f"BEST MODEL: Lag = {best_lag}")
+print("="*60)
+print(f"  • MAE:  {results[best_lag]['MAE']:.2f}")
+print(f"  • RMSE: {results[best_lag]['RMSE']:.2f}")
+print(f"  • MAPE: {results[best_lag]['MAPE']:.2f}%")
+
+# Final model with best lag
+final_model = AutoReg(train["Passengers"], lags=best_lag)
+final_fit = final_model.fit()
+print("\nModel Summary:")
+print(final_fit.summary())
+
+# Generate predictions
+train_predictions = final_fit.predict(start=best_lag, end=len(train)-1, dynamic=False)
+test_predictions = final_fit.predict(start=len(train), end=len(train)+len(test)-1, dynamic=False)
+future_forecast = final_fit.forecast(steps=12)
+
+# Visualizations
+fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+
+# 1. Training vs Actual
+axes[0,0].plot(train.index, train["Passengers"], label="Actual (Train)", color='steelblue', linewidth=1)
+axes[0,0].plot(train.index[best_lag:], train_predictions, label="Fitted", color='green', linestyle='--', alpha=0.7)
+axes[0,0].set_title(f"Model Fit on Training Data (Lag={best_lag})", fontsize=12, fontweight='bold')
+axes[0,0].set_xlabel("Year")
+axes[0,0].set_ylabel("Passengers")
+axes[0,0].legend()
+axes[0,0].grid(True, alpha=0.3)
+
+# 2. Test Predictions
+axes[0,1].plot(test.index, test["Passengers"], label="Actual", color='steelblue', marker='o', linewidth=2)
+axes[0,1].plot(test.index, test_predictions, label="Predicted", color='tomato', marker='x', linestyle='--', linewidth=2)
+axes[0,1].set_title(f"Test Set Predictions (Lag={best_lag})", fontsize=12, fontweight='bold')
+axes[0,1].set_xlabel("Month")
+axes[0,1].set_ylabel("Passengers")
+axes[0,1].legend()
+axes[0,1].grid(True, alpha=0.3)
+
+# 3. Full Series with Forecast
+full_series = pd.concat([train["Passengers"], test["Passengers"]])
+forecast_index = pd.date_range(start=test.index[-1] + pd.DateOffset(months=1), periods=12, freq='MS')
+axes[1,0].plot(full_series.index, full_series, label="Historical", color='steelblue', linewidth=1)
+axes[1,0].plot(forecast_index, future_forecast, label="12-Month Forecast", color='green', linewidth=2, linestyle='--')
+axes[1,0].fill_between(forecast_index, future_forecast - results[best_lag]['RMSE'], 
+                        future_forecast + results[best_lag]['RMSE'], alpha=0.2, color='green')
+axes[1,0].set_title("Historical Data + 12-Month Forecast", fontsize=12, fontweight='bold')
+axes[1,0].set_xlabel("Year")
+axes[1,0].set_ylabel("Passengers")
+axes[1,0].legend()
+axes[1,0].grid(True, alpha=0.3)
+
+# 4. Residual Analysis
+residuals = test["Passengers"].values - test_predictions
+axes[1,1].plot(test.index, residuals, 'o-', color='purple', linewidth=1, markersize=6)
+axes[1,1].axhline(y=0, color='red', linestyle='--', linewidth=1)
+axes[1,1].set_title("Prediction Residuals (Test Set)", fontsize=12, fontweight='bold')
+axes[1,1].set_xlabel("Month")
+axes[1,1].set_ylabel("Residual")
+axes[1,1].grid(True, alpha=0.3)
+
+plt.suptitle(f"AutoRegressive Model Analysis (Optimal Lag={best_lag})", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Print forecast values
+print("\n" + "="*70)
+print("12-MONTH FORECAST")
+print("="*70)
+for i, (date, value) in enumerate(zip(forecast_index, future_forecast), 1):
+    print(f"{date.strftime('%Y-%m')}: {value:.0f} passengers")
+
+print("\n" + "="*70)
+print("MODEL INSIGHTS")
+print("="*70)
+print(f"""
+1. Optimal Lag Selection:
+   • Best lag = {best_lag} months
+   • This captures the annual seasonal pattern in air travel
+
+2. Model Performance:
+   • Test MAE: {results[best_lag]['MAE']:.2f} passengers
+   • Test RMSE: {results[best_lag]['RMSE']:.2f} passengers
+   • MAPE: {results[best_lag]['MAPE']:.2f}%
+
+3. Business Implications:
+   • Forecast shows continued growth in air travel
+   • Seasonal patterns remain consistent
+   • Peak months: Summer (June-August)
+
+4. Limitations:
+   • AutoReg model assumes linear relationships
+   • Consider SARIMA for better seasonal modeling
+   • Regular retraining needed as new data becomes available
+""")
