@@ -1,0 +1,210 @@
+# Q18_student_marks_analysis.py
+"""
+QUESTION 18: Descriptive Analysis on Student Marks Dataset
+Dataset: Student_Marks.csv
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+
+# Load data
+df = pd.read_csv("Student_Marks.csv")
+
+print("\n" + "="*70)
+print("DESCRIPTIVE ANALYSIS - STUDENT MARKS DATASET")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Columns: {list(df.columns)}")
+print("\nFirst 5 rows:")
+print(df.head())
+
+print("\n" + "="*70)
+print("DATA OVERVIEW")
+print("="*70)
+print(df.info())
+
+# Descriptive statistics
+print("\n" + "="*70)
+print("DESCRIPTIVE STATISTICS")
+print("="*70)
+desc_stats = df.describe()
+print(desc_stats)
+
+# Detailed statistics per column
+print("\n" + "="*70)
+print("DETAILED STATISTICS PER COLUMN")
+print("="*70)
+
+for col in df.select_dtypes(include=[np.number]).columns:
+    print(f"\n{col.upper()}:")
+    print(f"  • Mean:     {df[col].mean():.4f}")
+    print(f"  • Median:   {df[col].median():.4f}")
+    print(f"  • Mode:     {df[col].mode()[0]:.4f}")
+    print(f"  • Std Dev:  {df[col].std():.4f}")
+    print(f"  • Variance: {df[col].var():.4f}")
+    print(f"  • Range:    {df[col].max() - df[col].min():.4f}")
+    print(f"  • Min:      {df[col].min():.4f}")
+    print(f"  • Max:      {df[col].max():.4f}")
+    print(f"  • Q1 (25%): {df[col].quantile(0.25):.4f}")
+    print(f"  • Q3 (75%): {df[col].quantile(0.75):.4f}")
+    print(f"  • IQR:      {df[col].quantile(0.75) - df[col].quantile(0.25):.4f}")
+    
+    # Skewness and Kurtosis
+    skewness = stats.skew(df[col].dropna())
+    kurtosis = stats.kurtosis(df[col].dropna())
+    
+    print(f"  • Skewness: {skewness:.4f} ", end="")
+    if skewness > 0.5:
+        print("(Positively skewed / Right-tailed)")
+    elif skewness < -0.5:
+        print("(Negatively skewed / Left-tailed)")
+    else:
+        print("(Approximately symmetric)")
+    
+    print(f"  • Kurtosis: {kurtosis:.4f} ", end="")
+    if kurtosis > 0:
+        print("(Leptokurtic - Heavy tails, peaked)")
+    elif kurtosis < 0:
+        print("(Platykurtic - Light tails, flat)")
+    else:
+        print("(Mesokurtic - Normal tail shape)")
+    
+    # Normality test (Shapiro-Wilk)
+    if len(df[col]) >= 3 and len(df[col]) <= 5000:
+        shapiro_stat, shapiro_p = stats.shapiro(df[col].dropna())
+        print(f"  • Shapiro-Wilk test: W={shapiro_stat:.4f}, p={shapiro_p:.4f} ", end="")
+        if shapiro_p > 0.05:
+            print("(Data is normally distributed)")
+        else:
+            print("(Data is NOT normally distributed)")
+
+# Visualizations
+fig = plt.figure(figsize=(18, 14))
+
+# 1. Histograms with KDE
+for i, col in enumerate(df.select_dtypes(include=[np.number]).columns):
+    ax = plt.subplot(2, 3, i+1)
+    df[col].hist(bins=20, density=True, alpha=0.6, color="steelblue", edgecolor="black", ax=ax)
+    
+    # Add KDE
+    df[col].plot.kde(ax=ax, color='red', linewidth=2)
+    
+    # Add normal distribution curve
+    mu, std = df[col].mean(), df[col].std()
+    x = np.linspace(df[col].min(), df[col].max(), 100)
+    ax.plot(x, stats.norm.pdf(x, mu, std), 'g--', linewidth=2, label='Normal')
+    
+    ax.set_title(f"{col}\nSkewness={stats.skew(df[col]):.3f}", fontsize=11, fontweight='bold')
+    ax.set_xlabel(col)
+    ax.set_ylabel("Density")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+plt.suptitle("Distribution Analysis with Normality Comparison", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# 2. Box plots and Q-Q plots
+fig, axes = plt.subplots(2, len(df.select_dtypes(include=[np.number]).columns), 
+                          figsize=(16, 10))
+
+for i, col in enumerate(df.select_dtypes(include=[np.number]).columns):
+    # Box plot
+    df.boxplot(column=col, ax=axes[0, i])
+    axes[0, i].set_title(f"Boxplot - {col}", fontsize=11, fontweight='bold')
+    axes[0, i].grid(True, alpha=0.3)
+    
+    # Q-Q plot
+    stats.probplot(df[col].dropna(), dist="norm", plot=axes[1, i])
+    axes[1, i].set_title(f"Q-Q Plot - {col}", fontsize=11, fontweight='bold')
+    axes[1, i].grid(True, alpha=0.3)
+
+plt.suptitle("Box Plots and Q-Q Plots for Normality Assessment", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# 3. Correlation heatmap
+fig, ax = plt.subplots(figsize=(10, 8))
+corr_matrix = df.select_dtypes(include=[np.number]).corr()
+sns.heatmap(corr_matrix, annot=True, fmt=".3f", cmap="coolwarm", 
+            ax=ax, square=True, cbar_kws={"shrink": 0.8})
+ax.set_title("Feature Correlation Heatmap", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# 4. Pairplot for relationships
+if len(df.select_dtypes(include=[np.number]).columns) <= 4:
+    fig = plt.figure(figsize=(12, 10))
+    sns.pairplot(df.select_dtypes(include=[np.number]))
+    plt.suptitle("Pairwise Relationships Between Features", y=1.02, fontsize=14, fontweight='bold')
+    plt.show()
+
+# 5. Cumulative distribution
+fig, ax = plt.subplots(figsize=(12, 6))
+for col in df.select_dtypes(include=[np.number]).columns:
+    sorted_data = np.sort(df[col].dropna())
+    cumulative = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+    ax.plot(sorted_data, cumulative, label=col, linewidth=2)
+
+ax.set_title("Cumulative Distribution Functions (CDF)", fontsize=14, fontweight='bold')
+ax.set_xlabel("Value")
+ax.set_ylabel("Cumulative Probability")
+ax.legend()
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+# Summary statistics table
+print("\n" + "="*70)
+print("SUMMARY STATISTICS TABLE")
+print("="*70)
+
+summary_df = pd.DataFrame({
+    'Mean': df.mean(),
+    'Median': df.median(),
+    'Std Dev': df.std(),
+    'Skewness': df.skew(),
+    'Kurtosis': df.kurtosis(),
+    'Min': df.min(),
+    'Max': df.max()
+})
+print(summary_df.round(4))
+
+print("\n" + "="*70)
+print("KEY FINDINGS & INSIGHTS")
+print("="*70)
+
+# Identify the most skewed and most normal distributions
+numeric_cols = df.select_dtypes(include=[np.number]).columns
+skewness_values = {col: stats.skew(df[col].dropna()) for col in numeric_cols}
+most_skewed = max(skewness_values, key=skewness_values.get)
+least_skewed = min(skewness_values, key=lambda x: abs(skewness_values[x]))
+
+print(f"""
+1. Central Tendency:
+   • Best performing feature (highest mean): {df.mean().idxmax()} ({df.mean().max():.4f})
+   • Worst performing feature (lowest mean): {df.mean().idxmin()} ({df.mean().min():.4f})
+
+2. Variability:
+   • Most variable (highest std): {df.std().idxmax()} (±{df.std().max():.4f})
+   • Least variable (lowest std): {df.std().idxmin()} (±{df.std().min():.4f})
+
+3. Distribution Shape:
+   • Most skewed feature: {most_skewed} (skewness={skewness_values[most_skewed]:.4f})
+   • Most symmetric feature: {least_skewed} (skewness={skewness_values[least_skewed]:.4f})
+
+4. Correlation Insights:
+   • Strongest correlation: {corr_matrix.unstack().sort_values(ascending=False).drop_duplicates().iloc[1] if len(corr_matrix)>1 else 'N/A'}
+
+5. Recommendations:
+   • Consider transformations for skewed features
+   • Use median instead of mean for skewed distributions
+   • Non-parametric tests may be more appropriate for non-normal data
+""")
+
+print("\n" + "="*70)
+print("DESCRIPTIVE ANALYSIS COMPLETED")
+print("="*70)
