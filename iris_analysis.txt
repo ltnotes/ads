@@ -1,0 +1,143 @@
+# Q14_iris_analysis.py
+"""
+QUESTION 14: Sepal Length vs Petal Length Analysis on Iris Dataset
+Dataset: iris (built-in sklearn)
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from sklearn.datasets import load_iris
+
+# Load data
+iris = load_iris(as_frame=True)
+df = iris.frame
+df["species_name"] = iris.target_names[iris.target]
+
+print("\n" + "="*70)
+print("IRIS DATASET: SEPAL LENGTH vs PETAL LENGTH ANALYSIS")
+print("="*70)
+print(f"Dataset shape: {df.shape}")
+print(f"Features: {list(df.columns[:-2])}")
+print(f"Species: {df['species_name'].unique()}")
+
+# Calculate correlation
+sepal_len = df["sepal length (cm)"]
+petal_len = df["petal length (cm)"]
+correlation, p_value = stats.pearsonr(sepal_len, petal_len)
+
+print("\n" + "="*60)
+print("CORRELATION ANALYSIS")
+print("="*60)
+print(f"Pearson Correlation Coefficient (r): {correlation:.4f}")
+print(f"P-value: {p_value:.4f}")
+
+if abs(correlation) < 0.3:
+    strength = "weak"
+elif abs(correlation) < 0.7:
+    strength = "moderate"
+else:
+    strength = "strong"
+
+print(f"Correlation strength: {strength} {'positive' if correlation > 0 else 'negative'}")
+
+if p_value < 0.05:
+    print("Conclusion: Statistically significant correlation")
+
+# Calculate regression line
+slope, intercept = np.polyfit(sepal_len, petal_len, 1)
+print(f"\nRegression equation: Petal Length = {slope:.4f} × Sepal Length + {intercept:.4f}")
+
+# Statistics by species
+print("\n" + "="*60)
+print("STATISTICS BY SPECIES")
+print("="*60)
+
+for species in df['species_name'].unique():
+    species_df = df[df['species_name'] == species]
+    print(f"\n{species.upper()}:")
+    print(f"  • Sepal Length: mean={species_df['sepal length (cm)'].mean():.2f}, "
+          f"std={species_df['sepal length (cm)'].std():.2f}")
+    print(f"  • Petal Length: mean={species_df['petal length (cm)'].mean():.2f}, "
+          f"std={species_df['petal length (cm)'].std():.2f}")
+    
+    # Correlation within species
+    corr_species, _ = stats.pearsonr(species_df['sepal length (cm)'], 
+                                      species_df['petal length (cm)'])
+    print(f"  • Within-species correlation: r={corr_species:.4f}")
+
+# Visualizations
+fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+
+# 1. Scatter plot with species coloring
+colors = {'setosa': 'red', 'versicolor': 'green', 'virginica': 'blue'}
+for species, group in df.groupby('species_name'):
+    axes[0,0].scatter(group['sepal length (cm)'], group['petal length (cm)'],
+                      label=species, c=colors[species], alpha=0.7, s=80, edgecolors='white')
+axes[0,0].plot(sepal_len, slope*sepal_len + intercept, 'k--', 
+               linewidth=2, label=f'Overall Trend (r={correlation:.2f})')
+axes[0,0].set_xlabel("Sepal Length (cm)", fontsize=11)
+axes[0,0].set_ylabel("Petal Length (cm)", fontsize=11)
+axes[0,0].set_title("Sepal Length vs Petal Length by Species", fontsize=12, fontweight='bold')
+axes[0,0].legend()
+axes[0,0].grid(True, alpha=0.3)
+
+# 2. Boxplot: Sepal Length by Species
+df.boxplot(column='sepal length (cm)', by='species_name', ax=axes[0,1])
+axes[0,1].set_title("Sepal Length Distribution by Species", fontsize=12, fontweight='bold')
+axes[0,1].set_xlabel("Species")
+axes[0,1].set_ylabel("Sepal Length (cm)")
+axes[0,1].grid(True, alpha=0.3)
+
+# 3. Boxplot: Petal Length by Species
+df.boxplot(column='petal length (cm)', by='species_name', ax=axes[1,0])
+axes[1,0].set_title("Petal Length Distribution by Species", fontsize=12, fontweight='bold')
+axes[1,0].set_xlabel("Species")
+axes[1,0].set_ylabel("Petal Length (cm)")
+axes[1,0].grid(True, alpha=0.3)
+
+# 4. Correlation Heatmap
+corr_matrix = df[['sepal length (cm)', 'sepal width (cm)', 
+                   'petal length (cm)', 'petal width (cm)']].corr()
+sns.heatmap(corr_matrix, annot=True, fmt=".3f", cmap="coolwarm", ax=axes[1,1],
+            square=True, cbar_kws={"shrink": 0.8})
+axes[1,1].set_title("Feature Correlation Heatmap", fontsize=12, fontweight='bold')
+
+plt.suptitle("Iris Dataset Analysis: Sepal Length vs Petal Length", fontsize=16, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Additional visualization: Pairplot
+fig = plt.figure(figsize=(12, 10))
+sns.pairplot(df, hue='species_name', diag_kind='hist', palette=colors)
+plt.suptitle("Pairwise Relationships in Iris Dataset", y=1.02, fontsize=14, fontweight='bold')
+plt.show()
+
+print("\n" + "="*70)
+print("KEY FINDINGS")
+print("="*70)
+print(f"""
+1. Overall Correlation:
+   • Sepal Length vs Petal Length: r = {correlation:.4f} ({strength} positive correlation)
+   • This indicates that irises with longer sepals tend to have longer petals
+
+2. Species Differentiation:
+   • Setosa: Clearly separable with short petals (< 2 cm)
+   • Versicolor: Intermediate characteristics
+   • Virginica: Largest sepal and petal lengths
+
+3. Within-Species Patterns:
+   • Different species show different internal correlations
+   • Setosa shows {stats.pearsonr(df[df['species_name']=='setosa']['sepal length (cm)'], 
+                                   df[df['species_name']=='setosa']['petal length (cm)'])[0]:.3f} correlation
+   • Versicolor: {stats.pearsonr(df[df['species_name']=='versicolor']['sepal length (cm)'], 
+                                  df[df['species_name']=='versicolor']['petal length (cm)'])[0]:.3f}
+   • Virginica: {stats.pearsonr(df[df['species_name']=='virginica']['sepal length (cm)'], 
+                                 df[df['species_name']=='virginica']['petal length (cm)'])[0]:.3f}
+
+4. Classification Implication:
+   • These features can effectively separate species
+   • Petal length is particularly discriminative
+""")
