@@ -19,7 +19,8 @@ for col in df.select_dtypes(include="object").columns:
 # Identify key columns
 cgpa_col = next((c for c in df.columns if "cgpa" in c.lower()), df.columns[0])
 exam_col = next((c for c in df.columns if "exam" in c.lower() or "mark" in c.lower()), df.columns[1])
-placed_col = next((c for c in df.columns if "plac" in c.lower()), df.columns[-1])
+# Corrected: Explicitly set 'placed_col' to 'placed' as seen in the dataframe preview.
+placed_col = 'placed'
 
 print("\n" + "="*60)
 print("DATA VISUALIZATION - PLACEMENT DATASET")
